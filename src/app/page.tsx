@@ -75,8 +75,8 @@ export default function AdminDashboard() {
 
   // Вкладка 1: Конструктор по Google Таблице
   const [sheetUrl, setSheetUrl] = useState("");
-  const [headerRowNumber, setHeaderRowNumber] = useState<number>(1); // 1-based для пользователя
-  const [dataStartRowNumber, setDataStartRowNumber] = useState<number>(2); // 1-based
+  const [headerRowNumber, setHeaderRowNumber] = useState<number>(1);
+  const [dataStartRowNumber, setDataStartRowNumber] = useState<number>(2);
   const [sheetColumns, setSheetColumns] = useState<SheetColumnInfo[]>([]);
   const [rawGrid, setRawGrid] = useState<string[][]>([]);
   const [loadingSheet, setLoadingSheet] = useState(false);
@@ -85,7 +85,9 @@ export default function AdminDashboard() {
     "Привет, команда проекта #{ID}!\n\nВаш шаблон отчёта:\n{B}"
   );
   const [customCellInput, setCustomCellInput] = useState<string>("C2");
-  const [onlySelectedInSheet, setOnlySelectedInSheet] = useState<boolean>(false);
+  const [sheetRecipientMode, setSheetRecipientMode] = useState<"all" | "selected">("all");
+  const [sheetSelectedIds, setSheetSelectedIds] = useState<Set<string>>(new Set());
+  const [sheetPreviewSearch, setSheetPreviewSearch] = useState<string>("");
   const [customOverrides, setCustomOverrides] = useState<Record<string, string>>({});
   const templateTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -126,7 +128,7 @@ export default function AdminDashboard() {
     fetchChats(savedPass, initialBackup, savedSheetUrl);
   }, []);
 
-  // Сохраняем бэкап чатов в localStorage браузера на случай если на Vercel ещё не подключен KV
+  // Сохраняем бэкап чатов в localStorage браузера
   useEffect(() => {
     if (Object.keys(chats).length > 0) {
       localStorage.setItem("bot500_local_chats_backup", JSON.stringify(chats));
@@ -159,7 +161,6 @@ export default function AdminDashboard() {
       const merged = { ...localBackup, ...serverChats };
       setChats(merged);
 
-      // Если это первая загрузка — выбираем все чаты по умолчанию
       if (selectedProjectIds.size === 0 && Object.keys(merged).length > 0) {
         setSelectedProjectIds(new Set(Object.keys(merged)));
       }
@@ -204,12 +205,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      setSheetColumns(data.columns || []);
-      setRawGrid(data.rawGrid || []);
+      const grid: string[][] = data.rawGrid || [];
+      const cols: SheetColumnInfo[] = data.columns || [];
+
+      setSheetColumns(cols);
+      setRawGrid(grid);
       setCustomOverrides({});
 
-      // Авто-определение столбца с ID стартапа (ищем столбец где значения похожи на 5-значные ID или совпадают с чатами)
-      const cols: SheetColumnInfo[] = data.columns || [];
+      // Авто-определение столбца с ID стартапа
+      let detectedIdLetter = idColumnLetter;
       if (cols.length > 0) {
         const idCol = cols.find(
           (c) =>
@@ -218,15 +222,26 @@ export default function AdminDashboard() {
             /^\d{3,7}$/.test(c.sample.trim())
         );
         if (idCol) {
+          detectedIdLetter = idCol.letter;
           setIdColumnLetter(idCol.letter);
         }
       }
 
+      // По умолчанию отмечаем все найденные в таблице стартапы
+      const idColIdx = columnLetterToIndex(detectedIdLetter);
+      const startIdx = Math.max(0, dataStartRowNumber - 1);
+      const allIdsInSheet = new Set<string>();
+      for (let r = startIdx; r < grid.length; r++) {
+        const rawIdCell = (grid[r]?.[idColIdx] || "").trim();
+        const idMatch = rawIdCell.match(/^(\d+)/);
+        const pid = idMatch ? idMatch[1] : rawIdCell;
+        if (pid) allIdsInSheet.add(pid);
+      }
+      setSheetSelectedIds(allIdsInSheet);
+
       setStatusMessage({
         type: "success",
-        text: `Таблица загружена! Строк: ${data.rawGrid?.length || 0}, столбцов: ${
-          data.columns?.length || 0
-        }.`,
+        text: `Таблица загружена! Строк: ${grid.length}, столбцов: ${cols.length}.`,
       });
     } catch (err: unknown) {
       setStatusMessage({
@@ -260,12 +275,6 @@ export default function AdminDashboard() {
     }, 10);
   }
 
-  // Вычисление текста сообщения для строки таблицы:
-  // Поддерживает:
-  // - {ID} — ID стартапа
-  // - {TITLE} — Название чата в ТГ
-  // - {A}, {B}, {AA} — значение из соответствующего столбца текущей строки стартапа
-  // - {B2}, {C15} — значение из конкретной фиксированной ячейки таблицы (столбец + номер строки)
   function renderTemplateForRow(row: string[], projectId: string, chatTitle: string): string {
     return sheetTemplate.replace(/\{([A-Za-z0-9_]+)\}/g, (fullMatch, token: string) => {
       const upper = token.toUpperCase();
@@ -273,7 +282,6 @@ export default function AdminDashboard() {
       if (upper === "ID") return projectId;
       if (upper === "TITLE") return chatTitle;
 
-      // Проверка на конкретную ячейку вида B2, C10, AA5
       const cellMatch = upper.match(/^([A-Z]+)(\d+)$/);
       if (cellMatch) {
         const colIdx = columnLetterToIndex(cellMatch[1]);
@@ -281,7 +289,6 @@ export default function AdminDashboard() {
         return rawGrid[rowIdx]?.[colIdx] ?? "";
       }
 
-      // Проверка на букву столбца текущей строки вида A, B, C, AA
       const colMatch = upper.match(/^([A-Z]+)$/);
       if (colMatch) {
         const colIdx = columnLetterToIndex(colMatch[1]);
@@ -292,8 +299,8 @@ export default function AdminDashboard() {
     });
   }
 
-  // Формируем предпросмотр индивидуальных сообщений по таблице
-  const sheetPreviewItems = useMemo(() => {
+  // Все строки стартапов из таблицы
+  const allSheetItems = useMemo(() => {
     if (!rawGrid.length) return [];
     const idColIdx = columnLetterToIndex(idColumnLetter);
     const startIdx = Math.max(0, dataStartRowNumber - 1);
@@ -311,14 +318,9 @@ export default function AdminDashboard() {
       if (!row || row.every((c) => !c.trim())) continue;
 
       const rawIdCell = (row[idColIdx] || "").trim();
-      // Извлекаем первые цифры из ячейки ID (на случай если в ячейке написано "30211 Marketing" или просто "30211")
       const idMatch = rawIdCell.match(/^(\d+)/);
       const projectId = idMatch ? idMatch[1] : rawIdCell;
       if (!projectId) continue;
-
-      if (onlySelectedInSheet && !selectedProjectIds.has(projectId)) {
-        continue;
-      }
 
       const chat = chats[projectId];
       const generatedText =
@@ -336,47 +338,114 @@ export default function AdminDashboard() {
     }
 
     return items;
-  }, [
-    rawGrid,
-    idColumnLetter,
-    dataStartRowNumber,
-    sheetTemplate,
-    chats,
-    onlySelectedInSheet,
-    selectedProjectIds,
-    customOverrides,
-  ]);
+  }, [rawGrid, idColumnLetter, dataStartRowNumber, sheetTemplate, chats, customOverrides]);
 
-  // Отправка сообщений по таблице
-  async function handleSendSheetMessages() {
-    const readyToSend = sheetPreviewItems.filter(
-      (item) => item.chat?.chatId && item.text.trim().length > 0
+  // При смене столбца ID автоматически обновляем выбор всех ID из таблицы
+  useEffect(() => {
+    if (allSheetItems.length > 0 && sheetSelectedIds.size === 0) {
+      setSheetSelectedIds(new Set(allSheetItems.map((i) => i.projectId)));
+    }
+  }, [allSheetItems]);
+
+  // Отфильтрованный поиском список в предпросмотре
+  const filteredSheetPreviewItems = useMemo(() => {
+    if (!sheetPreviewSearch.trim()) return allSheetItems;
+    const q = sheetPreviewSearch.toLowerCase();
+    return allSheetItems.filter(
+      (item) =>
+        item.projectId.toLowerCase().includes(q) ||
+        (item.chat?.title || "").toLowerCase().includes(q) ||
+        item.text.toLowerCase().includes(q)
     );
+  }, [allSheetItems, sheetPreviewSearch]);
 
-    if (readyToSend.length === 0) {
+  // Итоговый список стартапов к отправке из таблицы (с учетом режима "Всем" или "Выбранным")
+  const targetSheetItemsToSend = useMemo(() => {
+    return allSheetItems.filter((item) => {
+      if (!item.chat?.chatId || !item.text.trim()) return false;
+      if (sheetRecipientMode === "selected" && !sheetSelectedIds.has(item.projectId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [allSheetItems, sheetRecipientMode, sheetSelectedIds]);
+
+  function toggleSheetItemSelection(projectId: string) {
+    setSheetRecipientMode("selected");
+    setSheetSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
+
+  function selectAllSheetItems() {
+    setSheetSelectedIds(new Set(allSheetItems.map((i) => i.projectId)));
+  }
+
+  function deselectAllSheetItems() {
+    setSheetRecipientMode("selected");
+    setSheetSelectedIds(new Set());
+  }
+
+  // Отправка сообщений по таблице (всем или выбранным)
+  async function handleSendSheetMessages() {
+    if (targetSheetItemsToSend.length === 0) {
       setStatusMessage({
         type: "error",
-        text: "Нет готовых сообщений для привязанных чатов. Проверьте, что чаты привязаны и столбец ID выбран верно.",
+        text: "Нет выбранных привязанных чатов для отправки. Отметьте стартапы галочками или убедитесь, что чаты привязаны к боту.",
       });
       return;
     }
 
     if (
       !window.confirm(
-        `Отправить индивидуальные сообщения в ${readyToSend.length} чатов стартапов?`
+        `Отправить индивидуальные сообщения в ${targetSheetItemsToSend.length} чатов стартапов?`
       )
     ) {
       return;
     }
 
     await executeSendQueue(
-      readyToSend.map((item) => ({
+      targetSheetItemsToSend.map((item) => ({
         projectId: item.projectId,
         chatId: item.chat!.chatId,
         title: item.chat!.title,
         text: item.text,
       }))
     );
+  }
+
+  // Отправка только одному конкретному стартапу прямо из карточки предпросмотра
+  async function handleSendSingleSheetItem(item: {
+    projectId: string;
+    chat?: StartupChat;
+    text: string;
+  }) {
+    if (!item.chat?.chatId) {
+      setStatusMessage({
+        type: "error",
+        text: `Чат для проекта #${item.projectId} еще не привязан к боту`,
+      });
+      return;
+    }
+    if (!item.text.trim()) {
+      setStatusMessage({ type: "error", text: "Текст сообщения пуст" });
+      return;
+    }
+    if (!window.confirm(`Отправить сообщение только в чат «${item.chat.title}»?`)) {
+      return;
+    }
+
+    await executeSendQueue([
+      {
+        projectId: item.projectId,
+        chatId: item.chat.chatId,
+        title: item.chat.title,
+        text: item.text,
+      },
+    ]);
   }
 
   // Отправка общей/выборочной рассылки
@@ -574,7 +643,6 @@ export default function AdminDashboard() {
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      // Поддержка формата: "30211 -1001234567890 30211 Marketing Unit" или через запятую/табуляцию
       const parts = trimmed.split(/[\s,;|\t]+/);
       if (parts.length >= 2) {
         const projectId = parts[0].trim();
@@ -668,7 +736,9 @@ export default function AdminDashboard() {
                 Bot500 — Рассылки по стартапам
               </h1>
               <p className="text-xs text-slate-500">
-                Привязано чатов: <span className="font-semibold text-slate-700">{Object.keys(chats).length}</span> • Выбрано:{" "}
+                Привязано чатов:{" "}
+                <span className="font-semibold text-slate-700">{Object.keys(chats).length}</span> •
+                Выбрано:{" "}
                 <span className="font-semibold text-indigo-600">{selectedProjectIds.size}</span>
               </p>
             </div>
@@ -794,7 +864,7 @@ export default function AdminDashboard() {
         )}
       </header>
 
-      {/* Уведомление о статусе */}
+      {/* Основной контент */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {statusMessage && (
           <div
@@ -1005,7 +1075,7 @@ export default function AdminDashboard() {
                   </label>
                   <textarea
                     ref={templateTextareaRef}
-                    rows={8}
+                    rows={7}
                     value={sheetTemplate}
                     onChange={(e) => {
                       setSheetTemplate(e.target.value);
@@ -1014,19 +1084,38 @@ export default function AdminDashboard() {
                     placeholder="Напишите любой текст и вставьте нужные столбцы, например: Привет! Вот ваш отчёт: {B} и комментарий трекера: {D}"
                     className="w-full p-3.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none font-sans leading-relaxed"
                   />
+
                   <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-                    <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={onlySelectedInSheet}
-                        onChange={(e) => setOnlySelectedInSheet(e.target.checked)}
-                        className="rounded border-slate-300 text-indigo-600"
-                      />
-                      Отправлять только отмеченным галочкой во вкладке «База чатов» ({selectedProjectIds.size})
-                    </label>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-500">Кому отправлять:</span>
+                      <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setSheetRecipientMode("all")}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                            sheetRecipientMode === "all"
+                              ? "bg-white text-indigo-600 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Всем из таблицы ({allSheetItems.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSheetRecipientMode("selected")}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                            sheetRecipientMode === "selected"
+                              ? "bg-white text-indigo-600 shadow-sm"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Только выбранным ({sheetSelectedIds.size})
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-500">Форматирование:</span>
+                      <span className="text-slate-500">Разметка:</span>
                       <select
                         value={parseMode}
                         onChange={(e) =>
@@ -1036,7 +1125,7 @@ export default function AdminDashboard() {
                       >
                         <option value="HTML">HTML (&lt;b&gt;, &lt;i&gt;, &lt;a&gt;)</option>
                         <option value="Markdown">Markdown</option>
-                        <option value="">Без разметки (обычный текст)</option>
+                        <option value="">Без разметки</option>
                       </select>
                     </div>
                   </div>
@@ -1044,81 +1133,145 @@ export default function AdminDashboard() {
 
                 <button
                   onClick={handleSendSheetMessages}
-                  disabled={sending || sheetPreviewItems.length === 0}
+                  disabled={sending || targetSheetItemsToSend.length === 0}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-sm rounded-xl shadow-sm transition"
                 >
                   <Send className="w-4 h-4" />
                   {sending
                     ? "Отправляем рассылку..."
-                    : `Отправить индивидуальные сообщения (${
-                        sheetPreviewItems.filter((i) => i.chat?.chatId && i.text.trim()).length
-                      } чатов)`}
+                    : sheetRecipientMode === "all"
+                    ? `Отправить ВСЕМ привязанным чатам (${targetSheetItemsToSend.length} шт.)`
+                    : `Отправить ВЫБРАННЫМ чатам (${targetSheetItemsToSend.length} шт.)`}
                 </button>
               </div>
 
-              {/* Шаг 3: Предпросмотр сообщений по каждому стартапу */}
-              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col max-h-[680px]">
-                <div className="flex items-center justify-between mb-3">
+              {/* Шаг 3: Предпросмотр и выбор конкретных получателей */}
+              <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col max-h-[720px]">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div>
                     <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                       <Eye className="w-4 h-4 text-indigo-600" />
-                      3. Предпросмотр перед отправкой ({sheetPreviewItems.length})
+                      3. Получатели и предпросмотр ({filteredSheetPreviewItems.length})
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Вы можете проверить или подправить текст для любого конкретного стартапа прямо здесь:
+                      Отметьте галочками нужные стартапы (или отправьте одному кнопкой «Отправить только сюда»):
                     </p>
                   </div>
-                  {Object.keys(customOverrides).length > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
                     <button
-                      onClick={() => setCustomOverrides({})}
-                      className="text-xs text-indigo-600 hover:underline"
+                      type="button"
+                      onClick={selectAllSheetItems}
+                      className="font-medium text-indigo-600 hover:underline"
                     >
-                      Сбросить ручные правки
+                      Выбрать все
                     </button>
-                  )}
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={deselectAllSheetItems}
+                      className="font-medium text-slate-500 hover:underline"
+                    >
+                      Снять все
+                    </button>
+                    {Object.keys(customOverrides).length > 0 && (
+                      <>
+                        <span className="text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setCustomOverrides({})}
+                          className="text-rose-600 hover:underline"
+                        >
+                          Сбросить правки текста
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                {sheetPreviewItems.length === 0 ? (
+                {allSheetItems.length > 0 && (
+                  <div className="relative mb-3">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={sheetPreviewSearch}
+                      onChange={(e) => setSheetPreviewSearch(e.target.value)}
+                      placeholder="Поиск стартапа по ID (30211), названию или тексту..."
+                      className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300"
+                    />
+                  </div>
+                )}
+
+                {allSheetItems.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 rounded-xl text-slate-400">
                     <FileSpreadsheet className="w-10 h-10 mb-2 stroke-1" />
                     <p className="text-sm font-medium text-slate-600">
                       Загрузите Google Таблицу сверху
                     </p>
                     <p className="text-xs mt-1 max-w-sm">
-                      Здесь сразу появится предпросмотр того, какое сообщение получит каждый стартап по своему ID.
+                      Здесь сразу появится список всех стартапов из таблицы с возможностью выбрать кому отправлять.
                     </p>
                   </div>
                 ) : (
                   <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                    {sheetPreviewItems.map((item) => {
+                    {filteredSheetPreviewItems.map((item) => {
                       const isLinked = Boolean(item.chat?.chatId);
+                      const isChecked =
+                        sheetRecipientMode === "all" || sheetSelectedIds.has(item.projectId);
+
                       return (
                         <div
                           key={`${item.rowNumber}-${item.projectId}`}
-                          className={`p-3.5 rounded-xl border ${
-                            isLinked
-                              ? "border-slate-200 bg-slate-50/60"
+                          className={`p-3.5 rounded-xl border transition ${
+                            !isChecked
+                              ? "border-slate-200 bg-slate-100/50 opacity-60"
+                              : isLinked
+                              ? "border-indigo-200/80 bg-indigo-50/20"
                               : "border-amber-200 bg-amber-50/40"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-800">
-                                ID: {item.projectId}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleSheetItemSelection(item.projectId)}
+                                className="flex items-center gap-1.5 text-left"
+                              >
+                                {isChecked ? (
+                                  <CheckSquare className="w-4 h-4 text-indigo-600 shrink-0" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                                )}
+                                <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-800">
+                                  ID: {item.projectId}
+                                </span>
+                              </button>
+
                               <span className="text-xs text-slate-500">
                                 Строка #{item.rowNumber}
                               </span>
+
                               {item.chat ? (
                                 <span className="text-xs font-medium text-emerald-700">
                                   ✓ {item.chat.title}
                                 </span>
                               ) : (
                                 <span className="text-xs font-medium text-amber-700">
-                                  ⚠ Чат с ID {item.projectId} еще не привязан к боту
+                                  ⚠ Чат не привязан
                                 </span>
                               )}
                             </div>
+
+                            {item.chat && (
+                              <button
+                                type="button"
+                                disabled={sending}
+                                onClick={() => handleSendSingleSheetItem(item)}
+                                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 text-slate-700 transition"
+                              >
+                                <Send className="w-3 h-3" />
+                                Отправить только сюда
+                              </button>
+                            )}
                           </div>
 
                           <textarea
@@ -1510,4 +1663,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
