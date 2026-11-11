@@ -89,18 +89,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, chats });
     }
 
-    // 4. Синхронизация через getUpdates (если вебхук еще не стоял)
+    // 4. Синхронизация через getUpdates (автоматически отключает webhook перед getUpdates, если он мешает)
     if (action === "sync_updates") {
       const token = getBotToken(body.botToken);
-      const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
-      const data = await res.json();
+      let res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+      let data = await res.json();
+
+      // Если активен Webhook, Telegram возвращает 409 Conflict — отключаем Webhook с сохранением очереди и читаем getUpdates
+      if (!data.ok && String(data.description || "").toLowerCase().includes("webhook")) {
+        await fetch(
+          `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`
+        );
+        res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+        data = await res.json();
+      }
+
       if (!data.ok) {
         return NextResponse.json(
           {
             ok: false,
-            error:
-              data.description ||
-              "Не удалось получить getUpdates (возможно, уже включен Webhook — тогда новые чаты подтягиваются автоматически)",
+            error: data.description || "Не удалось получить getUpdates",
           },
           { status: 400 }
         );

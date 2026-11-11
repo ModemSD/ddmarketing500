@@ -36,22 +36,38 @@ export function extractProjectIdFromTitle(title?: string): string | null {
   return match ? match[1] : null;
 }
 
+const DEFAULT_INITIAL_CHATS: Record<string, StartupChat> = {
+  "26666": {
+    projectId: "26666",
+    chatId: "-5560094301",
+    title: "26666 Marketing Unit",
+    updatedAt: "2026-11-11T08:40:00.000Z",
+  },
+  "25555": {
+    projectId: "25555",
+    chatId: "-5257696187",
+    title: "25555 Marketing Unit",
+    updatedAt: "2026-11-11T08:40:00.000Z",
+  },
+};
+
 export async function getAllChats(): Promise<Record<string, StartupChat>> {
   const redis = getRedis();
   if (redis) {
     const data = await redis.get<Record<string, StartupChat>>(KV_KEY);
-    return data || {};
+    return { ...DEFAULT_INITIAL_CHATS, ...(data || {}) };
   }
 
   const filePath = getLocalFilePath();
   if (!fs.existsSync(filePath)) {
-    return {};
+    return { ...DEFAULT_INITIAL_CHATS };
   }
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as Record<string, StartupChat>;
+    const parsed = JSON.parse(raw) as Record<string, StartupChat>;
+    return { ...DEFAULT_INITIAL_CHATS, ...parsed };
   } catch {
-    return {};
+    return { ...DEFAULT_INITIAL_CHATS };
   }
 }
 
