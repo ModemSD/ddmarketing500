@@ -27,7 +27,7 @@ function applyUpdatesToPolls(
   const nextPolls: PollCampaign[] = JSON.parse(JSON.stringify(polls));
 
   for (const u of updates) {
-    if (u.poll) {
+    if (u.poll && u.poll.is_anonymous) {
       const pollId = String(u.poll.id);
       for (const campaign of nextPolls) {
         for (const pid of Object.keys(campaign.chats || {})) {

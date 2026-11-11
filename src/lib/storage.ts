@@ -391,7 +391,7 @@ export async function updatePollStateFromTelegram(
   for (const campaign of polls) {
     for (const pid of Object.keys(campaign.chats)) {
       const inst = campaign.chats[pid];
-      if (inst.pollId === pollId) {
+      if (String(inst.pollId) === String(pollId)) {
         inst.options = options;
         inst.totalVoterCount = totalVoterCount;
         inst.updatedAt = new Date().toISOString();
@@ -414,7 +414,7 @@ export async function updatePollAnswerFromTelegram(
   for (const campaign of polls) {
     for (const pid of Object.keys(campaign.chats)) {
       const inst = campaign.chats[pid];
-      if (inst.pollId === pollId) {
+      if (String(inst.pollId) === String(pollId)) {
         const uid = String(user.id);
         if (!inst.voters) inst.voters = {};
         if (optionIds.length === 0) {

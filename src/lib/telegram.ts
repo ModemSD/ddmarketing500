@@ -21,6 +21,11 @@ export interface TelegramPollAnswerObj {
     last_name?: string;
     username?: string;
   };
+  voter_chat?: {
+    id: number;
+    title?: string;
+    username?: string;
+  };
   option_ids: number[];
 }
 

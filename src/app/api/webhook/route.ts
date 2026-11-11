@@ -34,21 +34,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Обработка обновления счетчиков опроса (poll)
-    if (update.poll) {
+    // 2. Обработка конкретного голоса участника в неанонимном опросе (poll_answer)
+    // Важно: когда человек голосует в Telegram, Telegram присылает ДВА вебхука одновременно (update.poll и update.poll_answer).
+    // Чтобы update.poll не перезаписал voters старым стейтом из Redis (race condition),
+    // при неанонимных опросах мы обновляем и список voters, и счетчики прямо из poll_answer!
+    if (update.poll_answer) {
+      const voterUser = update.poll_answer.user || {
+        id: update.poll_answer.voter_chat?.id || Date.now(),
+        first_name: update.poll_answer.voter_chat?.title || "Участник",
+        username: update.poll_answer.voter_chat?.username,
+      };
+      await updatePollAnswerFromTelegram(
+        update.poll_answer.poll_id,
+        voterUser,
+        update.poll_answer.option_ids || []
+      );
+    }
+
+    // 3. Обработка обновления счетчиков опроса (poll) — ТОЛЬКО для анонимных опросов!
+    // Для неанонимных опросов (is_anonymous: false) все счетчики И список проголосовавших (voters)
+    // уже считает updatePollAnswerFromTelegram выше. Если сохранять и update.poll одновременно,
+    // два параллельных запроса в Redis перезаписывают друг друга (race condition) и стирают поле voters!
+    if (update.poll && update.poll.is_anonymous) {
       await updatePollStateFromTelegram(
         update.poll.id,
         update.poll.options.map((o) => ({ text: o.text, voterCount: o.voter_count })),
         update.poll.total_voter_count
-      );
-    }
-
-    // 3. Обработка конкретного голоса участника в неанонимном опросе (poll_answer)
-    if (update.poll_answer && update.poll_answer.user) {
-      await updatePollAnswerFromTelegram(
-        update.poll_answer.poll_id,
-        update.poll_answer.user,
-        update.poll_answer.option_ids || []
       );
     }
 
