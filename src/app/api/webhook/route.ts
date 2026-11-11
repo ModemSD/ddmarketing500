@@ -19,11 +19,10 @@ export async function POST(req: NextRequest) {
   try {
     const update = (await req.json()) as TelegramUpdate;
 
-    // 1. Обработка чата (новое сообщение или добавление бота)
+    // 1. Обработка чата (только когда бота добавили в группу или переименовали чат — не пересохраняем на каждое обычное сообщение)
     const chatObj =
-      update.message?.chat ||
       update.my_chat_member?.chat ||
-      update.channel_post?.chat;
+      (update.message?.new_chat_title ? update.message.chat : undefined);
 
     let detectedProjectId: string | null = null;
     if (chatObj && chatObj.title) {
@@ -38,19 +37,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 1.5. Сохранение входящего сообщения / ответа от участника в Фид
+    // 1.5. Сохранение ТОЛЬКО прямых ответов (Reply) на сообщения/опросы бота или упоминаний @ddmarketing500_bot
     const msg = update.message;
     if (msg && msg.chat && !msg.from?.is_bot) {
       const msgText = (msg.text || msg.caption || "").trim();
-      if (msgText) {
+      const replyMsg = msg.reply_to_message;
+      const isReplyToBot = Boolean(replyMsg?.from?.is_bot);
+      const isMentioningBot = msgText.toLowerCase().includes("@ddmarketing500_bot");
+
+      if (msgText && (isReplyToBot || isMentioningBot)) {
         const cleanChatId = normalizeChatIdString(msg.chat.id);
         const projId =
           detectedProjectId || extractProjectIdFromTitle(msg.chat.title) || "Чат";
+
+        // Заодно убеждаемся, что чат привязан в базе, если из него ответили боту
+        if (projId !== "Чат" && msg.chat.title) {
+          await upsertChat({
+            projectId: projId,
+            chatId: cleanChatId,
+            title: msg.chat.title,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
         const senderName =
           [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(" ") ||
           "Участник";
 
-        const replyMsg = msg.reply_to_message;
         const replyToText =
           replyMsg?.text ||
           replyMsg?.caption ||

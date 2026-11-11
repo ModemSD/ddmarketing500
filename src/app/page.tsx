@@ -2947,6 +2947,27 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {feedMessages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await fetch("/api/feed", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "x-admin-password": adminPassword,
+                        },
+                        body: JSON.stringify({ action: "clear_all" }),
+                      });
+                      const data = await res.json();
+                      if (data.ok) setFeedMessages([]);
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-xs font-semibold rounded-xl transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Очистить ленту
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => fetchFeed()}

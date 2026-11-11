@@ -265,7 +265,7 @@ export async function sendTelegramPoll(params: SendPollParams): Promise<{
           message_id: messageId,
           disable_notification: false,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     return {

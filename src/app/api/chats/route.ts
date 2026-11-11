@@ -147,13 +147,16 @@ export async function POST(req: NextRequest) {
 
         if (u.message && u.message.chat && !u.message.from?.is_bot) {
           const msgText = (u.message.text || u.message.caption || "").trim();
-          if (msgText) {
+          const replyMsg = u.message.reply_to_message;
+          const isReplyToBot = Boolean(replyMsg?.from?.is_bot);
+          const isMentioningBot = msgText.toLowerCase().includes("@ddmarketing500_bot");
+
+          if (msgText && (isReplyToBot || isMentioningBot)) {
             const cleanChatId = normalizeChatIdString(u.message.chat.id);
             const projId = extractProjectIdFromTitle(u.message.chat.title) || "Чат";
             const senderName =
               [u.message.from?.first_name, u.message.from?.last_name].filter(Boolean).join(" ") ||
               "Участник";
-            const replyMsg = u.message.reply_to_message;
             const replyToText =
               replyMsg?.text ||
               replyMsg?.caption ||
