@@ -108,6 +108,7 @@ export default function AdminDashboard() {
   const [sheetRecipientMode, setSheetRecipientMode] = useState<"all" | "selected">("all");
   const [sheetSelectedIds, setSheetSelectedIds] = useState<Set<string>>(new Set());
   const [sheetPreviewSearch, setSheetPreviewSearch] = useState<string>("");
+  const [showUnlinkedSheetRows, setShowUnlinkedSheetRows] = useState<boolean>(false);
   const [customOverrides, setCustomOverrides] = useState<Record<string, string>>({});
   const templateTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -256,17 +257,8 @@ export default function AdminDashboard() {
         }
       }
 
-      // По умолчанию отмечаем все найденные в таблице стартапы
-      const idColIdx = columnLetterToIndex(detectedIdLetter);
-      const startIdx = Math.max(0, dataStartRowNumber - 1);
-      const allIdsInSheet = new Set<string>();
-      for (let r = startIdx; r < grid.length; r++) {
-        const rawIdCell = (grid[r]?.[idColIdx] || "").trim();
-        const idMatch = rawIdCell.match(/^(\d+)/);
-        const pid = idMatch ? idMatch[1] : rawIdCell;
-        if (pid) allIdsInSheet.add(pid);
-      }
-      setSheetSelectedIds(allIdsInSheet);
+      // По умолчанию отмечаем все чаты из Базы чатов
+      setSheetSelectedIds(new Set(Object.keys(chats)));
 
       setStatusMessage({
         type: "success",
@@ -328,19 +320,16 @@ export default function AdminDashboard() {
     });
   }
 
-  // Все строки стартапов из таблицы
+  // Строим список получателей на основе БАЗЫ ЧАТОВ + сопоставляем строки из Google Таблицы по ID проекта
   const allSheetItems = useMemo(() => {
-    if (!rawGrid.length) return [];
     const idColIdx = columnLetterToIndex(idColumnLetter);
     const startIdx = Math.max(0, dataStartRowNumber - 1);
 
-    const items: Array<{
-      rowNumber: number;
-      projectId: string;
-      chat?: StartupChat;
-      text: string;
-      rowValues: string[];
-    }> = [];
+    // Карта строк из Google Таблицы по ID проекта (только цифровые ID)
+    const sheetRowsByProjectId = new Map<
+      string,
+      { rowNumber: number; rowValues: string[] }
+    >();
 
     for (let r = startIdx; r < rawGrid.length; r++) {
       const row = rawGrid[r];
@@ -348,26 +337,80 @@ export default function AdminDashboard() {
 
       const rawIdCell = (row[idColIdx] || "").trim();
       const idMatch = rawIdCell.match(/^(\d+)/);
-      const projectId = idMatch ? idMatch[1] : rawIdCell;
-      if (!projectId) continue;
+      if (!idMatch) continue; // Пропускаем строки-заголовки вроде "ID"
+      const projectId = idMatch[1];
 
-      const chat = chats[projectId];
+      if (!sheetRowsByProjectId.has(projectId)) {
+        sheetRowsByProjectId.set(projectId, { rowNumber: r + 1, rowValues: row });
+      }
+    }
+
+    const items: Array<{
+      rowNumber?: number;
+      projectId: string;
+      chat?: StartupChat;
+      hasSheetRow: boolean;
+      text: string;
+      rowValues: string[];
+    }> = [];
+
+    // 1. Сначала идут все чаты из нашей Базы чатов
+    const sortedChats = Object.values(chats).sort((a, b) =>
+      a.projectId.localeCompare(b.projectId)
+    );
+
+    for (const chat of sortedChats) {
+      const sheetMatch = sheetRowsByProjectId.get(chat.projectId);
+      const rowValues = sheetMatch?.rowValues || [];
       const generatedText =
-        customOverrides[projectId] !== undefined
-          ? customOverrides[projectId]
-          : renderTemplateForRow(row, projectId, chat?.title || `${projectId} Marketing Unit`);
+        customOverrides[chat.projectId] !== undefined
+          ? customOverrides[chat.projectId]
+          : renderTemplateForRow(rowValues, chat.projectId, chat.title);
 
       items.push({
-        rowNumber: r + 1,
-        projectId,
+        rowNumber: sheetMatch?.rowNumber,
+        projectId: chat.projectId,
         chat,
+        hasSheetRow: Boolean(sheetMatch),
         text: generatedText,
-        rowValues: row,
+        rowValues,
       });
     }
 
+    // 2. Опционально: если включен показ непривязанных строк из таблицы
+    if (showUnlinkedSheetRows) {
+      for (const [projectId, sheetMatch] of sheetRowsByProjectId.entries()) {
+        if (chats[projectId]) continue;
+        const generatedText =
+          customOverrides[projectId] !== undefined
+            ? customOverrides[projectId]
+            : renderTemplateForRow(
+                sheetMatch.rowValues,
+                projectId,
+                `${projectId} Marketing Unit`
+              );
+
+        items.push({
+          rowNumber: sheetMatch.rowNumber,
+          projectId,
+          chat: undefined,
+          hasSheetRow: true,
+          text: generatedText,
+          rowValues: sheetMatch.rowValues,
+        });
+      }
+    }
+
     return items;
-  }, [rawGrid, idColumnLetter, dataStartRowNumber, sheetTemplate, chats, customOverrides]);
+  }, [
+    rawGrid,
+    idColumnLetter,
+    dataStartRowNumber,
+    sheetTemplate,
+    chats,
+    customOverrides,
+    showUnlinkedSheetRows,
+  ]);
 
   useEffect(() => {
     if (allSheetItems.length > 0 && sheetSelectedIds.size === 0) {
@@ -1114,7 +1157,7 @@ export default function AdminDashboard() {
                               : "text-slate-600 hover:text-slate-900"
                           }`}
                         >
-                          Всем из таблицы ({allSheetItems.length})
+                          Всем из базы чатов ({Object.keys(chats).length})
                         </button>
                         <button
                           type="button"
@@ -1167,10 +1210,10 @@ export default function AdminDashboard() {
                   <div>
                     <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                       <Eye className="w-4 h-4 text-indigo-600" />
-                      3. Получатели и предпросмотр ({filteredSheetPreviewItems.length})
+                      3. Получатели из Базы чатов ({filteredSheetPreviewItems.length})
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Отметьте галочками нужные стартапы (или отправьте одному кнопкой «Отправить только сюда»):
+                      Чаты берутся из вашей «Базы чатов», а данные подставляются из таблицы по совпадению ID:
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
@@ -1204,27 +1247,38 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {allSheetItems.length > 0 && (
-                  <div className="relative mb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="relative flex-1 min-w-[200px]">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
                       value={sheetPreviewSearch}
                       onChange={(e) => setSheetPreviewSearch(e.target.value)}
-                      placeholder="Поиск стартапа по ID (30211), названию или тексту..."
+                      placeholder="Поиск чата по ID (30211), названию или тексту..."
                       className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300"
                     />
                   </div>
-                )}
+                  {rawGrid.length > 0 && (
+                    <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={showUnlinkedSheetRows}
+                        onChange={(e) => setShowUnlinkedSheetRows(e.target.checked)}
+                        className="rounded border-slate-300 text-indigo-600"
+                      />
+                      Показать непривязанные из таблицы
+                    </label>
+                  )}
+                </div>
 
                 {allSheetItems.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 rounded-xl text-slate-400">
-                    <FileSpreadsheet className="w-10 h-10 mb-2 stroke-1" />
+                    <Users className="w-10 h-10 mb-2 stroke-1" />
                     <p className="text-sm font-medium text-slate-600">
-                      Загрузите Google Таблицу сверху
+                      В «Базе чатов» пока нет чатов
                     </p>
                     <p className="text-xs mt-1 max-w-sm">
-                      Здесь сразу появится список всех стартапов из таблицы с возможностью выбрать кому отправлять.
+                      Добавьте чаты во вкладке «База чатов» (или включите галочку «Показать непривязанные из таблицы» выше).
                     </p>
                   </div>
                 ) : (
@@ -1236,11 +1290,11 @@ export default function AdminDashboard() {
 
                       return (
                         <div
-                          key={`${item.rowNumber}-${item.projectId}`}
+                          key={`${item.rowNumber || "chat"}-${item.projectId}`}
                           className={`p-3.5 rounded-xl border transition ${
                             !isChecked
                               ? "border-slate-200 bg-slate-100/50 opacity-60"
-                              : isLinked
+                              : isLinked && item.hasSheetRow
                               ? "border-indigo-200/80 bg-indigo-50/20"
                               : "border-amber-200 bg-amber-50/40"
                           }`}
@@ -1262,19 +1316,26 @@ export default function AdminDashboard() {
                                 </span>
                               </button>
 
-                              <span className="text-xs text-slate-500">
-                                Строка #{item.rowNumber}
-                              </span>
-
                               {item.chat ? (
                                 <span className="text-xs font-medium text-emerald-700">
                                   ✓ {item.chat.title}
                                 </span>
                               ) : (
                                 <span className="text-xs font-medium text-amber-700">
-                                  ⚠ Чат не привязан
+                                  ⚠ Чат не в базе
                                 </span>
                               )}
+
+                              {rawGrid.length > 0 &&
+                                (item.hasSheetRow ? (
+                                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">
+                                    Строка #{item.rowNumber} в таблице
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
+                                    Нет ID {item.projectId} в таблице
+                                  </span>
+                                ))}
                             </div>
 
                             {item.chat && (
