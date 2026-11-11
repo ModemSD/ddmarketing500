@@ -37,10 +37,33 @@ export function getBotToken(overrideToken?: string): string {
 }
 
 function normalizeChatId(chatId: string | number): string {
-  // Заменяем любые нестандартные тире (en-dash –, em-dash —, minus −) на обычный дефис "-"
-  return String(chatId)
-    .trim()
-    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+  const digits = String(chatId).replace(/\D/g, "");
+  if (!digits) return String(chatId).trim();
+  return `-${digits}`;
+}
+
+async function callSendMessage(
+  token: string,
+  chatId: string,
+  text: string,
+  parseMode: "HTML" | "Markdown" | ""
+): Promise<{ ok: boolean; description?: string }> {
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  };
+  if (parseMode) {
+    body.parse_mode = parseMode;
+  }
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  return await res.json();
 }
 
 export async function sendTelegramMessage(
@@ -50,24 +73,20 @@ export async function sendTelegramMessage(
   overrideToken?: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const token = getBotToken(overrideToken);
+    const primaryToken = getBotToken(overrideToken);
     const cleanChatId = normalizeChatId(chatId);
-    const body: Record<string, unknown> = {
-      chat_id: cleanChatId,
-      text,
-      disable_web_page_preview: true,
-    };
-    if (parseMode) {
-      body.parse_mode = parseMode;
+
+    let data = await callSendMessage(primaryToken, cleanChatId, text, parseMode);
+
+    // Если в настройках браузера/Vercel был указан старый/другой бот, у которого нет этого чата,
+    // пробуем отправить через основной токен @ddmarketing500_bot
+    if (!data.ok && primaryToken !== FALLBACK_BOT_TOKEN) {
+      const retryData = await callSendMessage(FALLBACK_BOT_TOKEN, cleanChatId, text, parseMode);
+      if (retryData.ok) {
+        return { ok: true };
+      }
     }
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
     if (!data.ok) {
       return { ok: false, error: data.description || "Ошибка Telegram API" };
     }

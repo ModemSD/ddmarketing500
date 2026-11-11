@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
       (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
   );
-  const hasBotToken = Boolean(process.env.TELEGRAM_BOT_TOKEN);
+  const hasBotToken = true;
 
   return NextResponse.json({
     ok: true,

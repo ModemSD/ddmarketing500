@@ -57,9 +57,9 @@ interface ConfirmModalState {
 }
 
 function normalizeDash(str: string): string {
-  return String(str)
-    .trim()
-    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+  const digits = String(str).replace(/\D/g, "");
+  if (!digits) return String(str).trim();
+  return `-${digits}`;
 }
 
 function columnLetterToIndex(letter: string): number {

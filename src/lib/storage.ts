@@ -83,9 +83,9 @@ export async function saveAllChats(chats: Record<string, StartupChat>): Promise<
 }
 
 export function normalizeChatIdString(chatId: string | number): string {
-  return String(chatId)
-    .trim()
-    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+  const digits = String(chatId).replace(/\D/g, "");
+  if (!digits) return "";
+  return `-${digits}`;
 }
 
 export async function upsertChat(chat: StartupChat): Promise<Record<string, StartupChat>> {
