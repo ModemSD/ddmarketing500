@@ -24,6 +24,8 @@ import {
   Pin,
   Folder,
   Filter,
+  Lock,
+  LogOut,
 } from "lucide-react";
 
 interface StartupChat {
@@ -125,6 +127,11 @@ export default function AdminDashboard() {
 
   // Авторизация и настройки
   const [adminPassword, setAdminPassword] = useState("");
+  const [loginInput, setLoginInput] = useState("");
+  const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "unauthenticated">(
+    "checking"
+  );
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [customBotToken, setCustomBotToken] = useState("");
   const [hasServerBotToken, setHasServerBotToken] = useState(false);
   const [hasKv, setHasKv] = useState(false);
@@ -250,8 +257,7 @@ export default function AdminDashboard() {
       }
     }
 
-    fetchChats(savedPass, initialBackup, savedSheetUrl);
-    fetchPolls(savedPass, initialPollsBackup, savedToken);
+    fetchChats(savedPass, initialBackup, savedSheetUrl, initialPollsBackup, savedToken);
   }, []);
 
   const pollsHistoryRef = useRef<PollCampaign[]>([]);
@@ -261,13 +267,13 @@ export default function AdminDashboard() {
 
   // Авто-обновление голосов каждые 5 секунд, пока открыта вкладка "Опросы"
   useEffect(() => {
-    if (activeTab !== "polls") return;
+    if (activeTab !== "polls" || authStatus !== "authenticated") return;
     fetchPolls(adminPassword, pollsHistoryRef.current, customBotToken);
     const timer = setInterval(() => {
       fetchPolls(adminPassword, pollsHistoryRef.current, customBotToken);
     }, 5000);
     return () => clearInterval(timer);
-  }, [activeTab, adminPassword, customBotToken]);
+  }, [activeTab, adminPassword, customBotToken, authStatus]);
 
   // Сохраняем бэкап опросов в localStorage браузера
   useEffect(() => {
@@ -529,19 +535,31 @@ export default function AdminDashboard() {
   async function fetchChats(
     pass = adminPassword,
     localBackup: Record<string, StartupChat> = {},
-    currentSheetUrl = sheetUrl
-  ) {
+    currentSheetUrl = sheetUrl,
+    initialPollsBackup?: PollCampaign[],
+    tokenOverride?: string
+  ): Promise<boolean> {
     setLoadingChats(true);
     try {
       const res = await fetch("/api/chats", {
         headers: { "x-admin-password": pass },
       });
       const data = await res.json();
+      if (res.status === 401) {
+        setAuthStatus("unauthenticated");
+        if (pass) {
+          setLoginError("Неверный пароль доступа к кабинету");
+        }
+        return false;
+      }
       if (!res.ok || !data.ok) {
         setStatusMessage({ type: "error", text: data.error || "Ошибка загрузки чатов" });
-        return;
+        setAuthStatus("authenticated");
+        return false;
       }
 
+      setAuthStatus("authenticated");
+      setLoginError(null);
       setHasKv(Boolean(data.hasKv));
       setHasServerBotToken(Boolean(data.hasBotToken));
       if (!currentSheetUrl && data.defaultSheetUrl) {
@@ -561,14 +579,44 @@ export default function AdminDashboard() {
       if (selectedProjectIds.size === 0 && Object.keys(merged).length > 0) {
         setSelectedProjectIds(new Set(Object.keys(merged)));
       }
+
+      if (initialPollsBackup !== undefined) {
+        fetchPolls(pass, initialPollsBackup, tokenOverride);
+      }
+
+      return true;
     } catch (err: unknown) {
       setStatusMessage({
         type: "error",
         text: err instanceof Error ? err.message : "Ошибка соединения с сервером",
       });
+      return false;
     } finally {
       setLoadingChats(false);
     }
+  }
+
+  async function handleLoginSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = loginInput.trim();
+    if (!trimmed) {
+      setLoginError("Введите пароль");
+      return;
+    }
+    setLoginError(null);
+    const ok = await fetchChats(trimmed);
+    if (ok) {
+      setAdminPassword(trimmed);
+      localStorage.setItem("bot500_admin_password", trimmed);
+      fetchPolls(trimmed, pollsHistory, customBotToken);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("bot500_admin_password");
+    setAdminPassword("");
+    setLoginInput("");
+    setAuthStatus("unauthenticated");
   }
 
   // Загрузка и парсинг Google Таблицы
@@ -1244,6 +1292,76 @@ export default function AdminDashboard() {
     });
   }
 
+  // Экран проверки сессии или форма входа (чтобы посторонние не увидели кабинет и не сделали рассылку)
+  if (authStatus === "checking") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <RefreshCw className="w-7 h-7 animate-spin text-indigo-600" />
+          <span className="text-sm font-medium">Проверка доступа к кабинету...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col items-center text-center space-y-2">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-md">
+              <Lock className="w-7 h-7" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 pt-1">
+              Вход в кабинет Bot500
+            </h1>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Панель управления рассылками и опросами по стартапам защищена паролем администратора.
+            </p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Пароль доступа
+              </label>
+              <input
+                type="password"
+                autoFocus
+                value={loginInput}
+                onChange={(e) => setLoginInput(e.target.value)}
+                placeholder="Введите пароль администратора..."
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              />
+            </div>
+
+            {loginError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loadingChats}
+              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {loadingChats ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Проверка...
+                </>
+              ) : (
+                "Войти в кабинет"
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* Верхняя шапка */}
@@ -1314,13 +1432,25 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700"
-          >
-            <Settings className="w-4 h-4" />
-            Настройки
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
+            >
+              <Settings className="w-4 h-4" />
+              Настройки
+            </button>
+            {adminPassword && (
+              <button
+                onClick={handleLogout}
+                title="Выйти из кабинета"
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                Выйти
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Выпадающая панель настроек */}
