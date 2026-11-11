@@ -202,6 +202,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, polls: combined });
     }
 
+    // 2b. Удаление папки (перенос опросов из удаленной папки в резервную)
+    if (action === "delete_folder") {
+      const { folderToDelete, fallbackFolder = "Общие опросы", clientPolls = [] } = body;
+      const serverPolls = await getAllPolls();
+      const combined = mergePollCampaignLists(serverPolls, clientPolls);
+      for (const p of combined) {
+        if ((p.folder || "Общие опросы").trim() === String(folderToDelete).trim()) {
+          p.folder = String(fallbackFolder).trim();
+        }
+      }
+      await saveAllPolls(combined);
+      return NextResponse.json({ ok: true, polls: combined });
+    }
+
     // 3. Удаление опроса из истории
     if (action === "delete") {
       const { pollCampaignId, clientPolls = [] } = body;

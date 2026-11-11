@@ -392,6 +392,47 @@ export default function AdminDashboard() {
     setStatusMessage({ type: "success", text: `Папка «${clean}» создана и выбрана!` });
   }
 
+  async function handleDeleteFolder(folderName: string) {
+    const remaining = pollFoldersList.filter((f) => f !== folderName);
+    const fallback = remaining[0] || "Общие опросы";
+    const nextCustom = remaining.length > 0 ? remaining : ["Общие опросы"];
+
+    setCustomFolders(nextCustom);
+    localStorage.setItem("bot500_poll_folders", JSON.stringify(nextCustom));
+
+    if (pollFolder === folderName) {
+      setPollFolder(fallback);
+    }
+    if (selectedPollFolderFilter === folderName) {
+      setSelectedPollFolderFilter("ALL");
+    }
+
+    const nextLocalPolls = pollsHistory.map((p) =>
+      (p.folder || "Общие опросы").trim() === folderName ? { ...p, folder: fallback } : p
+    );
+    setPollsHistory(nextLocalPolls);
+    localStorage.setItem("bot500_local_polls_backup", JSON.stringify(nextLocalPolls));
+
+    await fetch("/api/polls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({
+        action: "delete_folder",
+        folderToDelete: folderName,
+        fallbackFolder: fallback,
+        clientPolls: nextLocalPolls,
+      }),
+    }).catch(() => {});
+
+    setStatusMessage({
+      type: "info",
+      text: `Папка «${folderName}» удалена`,
+    });
+  }
+
   async function handleMovePollToFolder(pollCampaignId: string, targetFolder: string) {
     const cleanFolder = targetFolder.trim() || "Общие опросы";
     const nextLocal = pollsHistory.map((p) =>
@@ -2094,18 +2135,37 @@ export default function AdminDashboard() {
                     ).length;
                     const active = selectedPollFolderFilter === folderName;
                     return (
-                      <button
+                      <div
                         key={folderName}
-                        type="button"
-                        onClick={() => setSelectedPollFolderFilter(folderName)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                        className={`inline-flex items-center rounded-lg text-xs font-medium transition overflow-hidden ${
                           active
                             ? "bg-indigo-600 text-white shadow-xs"
                             : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
                         }`}
                       >
-                        📁 {folderName} ({count})
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPollFolderFilter(folderName)}
+                          className="px-2.5 py-1 flex items-center gap-1"
+                        >
+                          📁 {folderName} ({count})
+                        </button>
+                        {pollFoldersList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteFolder(folderName);
+                            }}
+                            title={`Удалить папку «${folderName}»`}
+                            className={`pr-2 pl-1 py-1 hover:opacity-100 opacity-60 transition ${
+                              active ? "text-white hover:text-rose-200" : "text-slate-400 hover:text-rose-600"
+                            }`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                   <button
