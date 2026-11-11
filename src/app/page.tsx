@@ -167,6 +167,14 @@ export default function AdminDashboard() {
   const [loadingPolls, setLoadingPolls] = useState(false);
   const [selectedPollFolderFilter, setSelectedPollFolderFilter] = useState<string>("ALL");
   const [selectedPollProjectFilter, setSelectedPollProjectFilter] = useState<string>("ALL");
+  const [customFolders, setCustomFolders] = useState<string[]>([
+    "Неделя 1",
+    "Неделя 2",
+    "Маркетинг",
+    "Отчёты",
+  ]);
+  const [newFolderName, setNewFolderName] = useState<string>("");
+  const [showNewFolderInput, setShowNewFolderInput] = useState<boolean>(false);
 
   // Модальное окно подтверждения отправки (вместо системного window.confirm)
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
@@ -187,11 +195,22 @@ export default function AdminDashboard() {
     const savedTemplate = localStorage.getItem("bot500_sheet_template");
     const savedLocalChats = localStorage.getItem("bot500_local_chats_backup");
     const savedLocalPolls = localStorage.getItem("bot500_local_polls_backup");
+    const savedCustomFolders = localStorage.getItem("bot500_poll_folders");
 
     if (savedPass) setAdminPassword(savedPass);
     if (savedToken) setCustomBotToken(savedToken);
     if (savedSheetUrl) setSheetUrl(savedSheetUrl);
     if (savedTemplate) setSheetTemplate(savedTemplate);
+    if (savedCustomFolders) {
+      try {
+        const parsedFolders = JSON.parse(savedCustomFolders);
+        if (Array.isArray(parsedFolders) && parsedFolders.length > 0) {
+          setCustomFolders(parsedFolders);
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     let initialBackup: Record<string, StartupChat> = {};
     if (savedLocalChats) {
@@ -349,14 +368,52 @@ export default function AdminDashboard() {
     });
   }
 
-  // Список всех папок опросов
+  // Список всех папок опросов (созданные пользователем + из истории опросов)
   const pollFoldersList = useMemo(() => {
-    const set = new Set<string>(["Неделя 1", "Неделя 2", "Маркетинг", "Отчёты"]);
+    const set = new Set<string>(customFolders);
     for (const p of pollsHistory) {
-      set.add((p.folder || "Общие опросы").trim());
+      if (p.folder?.trim()) {
+        set.add(p.folder.trim());
+      }
     }
     return Array.from(set);
-  }, [pollsHistory]);
+  }, [pollsHistory, customFolders]);
+
+  function handleCreateFolder() {
+    const clean = newFolderName.trim();
+    if (!clean) return;
+    const next = Array.from(new Set([...customFolders, clean]));
+    setCustomFolders(next);
+    localStorage.setItem("bot500_poll_folders", JSON.stringify(next));
+    setPollFolder(clean);
+    setSelectedPollFolderFilter(clean);
+    setNewFolderName("");
+    setShowNewFolderInput(false);
+    setStatusMessage({ type: "success", text: `Папка «${clean}» создана и выбрана!` });
+  }
+
+  async function handleMovePollToFolder(pollCampaignId: string, targetFolder: string) {
+    const cleanFolder = targetFolder.trim() || "Общие опросы";
+    const nextLocal = pollsHistory.map((p) =>
+      p.id === pollCampaignId ? { ...p, folder: cleanFolder } : p
+    );
+    setPollsHistory(nextLocal);
+    localStorage.setItem("bot500_local_polls_backup", JSON.stringify(nextLocal));
+
+    await fetch("/api/polls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({
+        action: "move_folder",
+        pollCampaignId,
+        folder: cleanFolder,
+        clientPolls: nextLocal,
+      }),
+    }).catch(() => {});
+  }
 
   // Отфильтрованные опросы по выбранной папке и по выбранному проекту (стартапу)
   const filteredPollsHistory = useMemo(() => {
@@ -1815,26 +1872,35 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  <div className="sm:col-span-4">
+                  <div className="sm:col-span-5">
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Папка / Кампания опроса
+                      Папка опроса
                     </label>
-                    <input
-                      type="text"
-                      list="poll-folders-datalist"
-                      value={pollFolder}
-                      onChange={(e) => setPollFolder(e.target.value)}
-                      placeholder="Неделя 1, Чек-ин..."
-                      className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
-                    />
-                    <datalist id="poll-folders-datalist">
-                      {pollFoldersList.map((f) => (
-                        <option key={f} value={f} />
-                      ))}
-                    </datalist>
+                    <div className="flex gap-1.5">
+                      <select
+                        value={pollFolder}
+                        onChange={(e) => setPollFolder(e.target.value)}
+                        className="flex-1 px-3 py-2.5 text-sm rounded-xl border border-slate-300 bg-white focus:border-indigo-500 focus:outline-none font-medium"
+                      >
+                        {pollFoldersList.map((f) => (
+                          <option key={f} value={f}>
+                            📁 {f}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewFolderInput(!showNewFolderInput)}
+                        title="Создать новую папку"
+                        className="px-3 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold shrink-0 flex items-center gap-1 transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Папка
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="sm:col-span-8">
+                  <div className="sm:col-span-7">
                     <label className="block text-xs font-medium text-slate-700 mb-1">
                       Вопрос опроса (до 300 символов)
                     </label>
@@ -1847,6 +1913,39 @@ export default function AdminDashboard() {
                     />
                   </div>
                 </div>
+
+                {showNewFolderInput && (
+                  <div className="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 flex items-center gap-2">
+                    <Folder className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <input
+                      type="text"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCreateFolder();
+                        }
+                      }}
+                      placeholder="Название новой папки (например: Демо-день, Опрос 12.11)..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateFolder}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                    >
+                      Создать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewFolderInput(false)}
+                      className="p-1 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -1989,9 +2088,7 @@ export default function AdminDashboard() {
                   >
                     Все папки ({pollsHistory.length})
                   </button>
-                  {Array.from(
-                    new Set(pollsHistory.map((p) => (p.folder || "Общие опросы").trim()))
-                  ).map((folderName) => {
+                  {pollFoldersList.map((folderName) => {
                     const count = pollsHistory.filter(
                       (p) => (p.folder || "Общие опросы").trim() === folderName
                     ).length;
@@ -2011,6 +2108,14 @@ export default function AdminDashboard() {
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setShowNewFolderInput(true)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Новая папка
+                  </button>
                 </div>
 
                 {/* Фильтр по конкретному стартапу */}
@@ -2061,10 +2166,21 @@ export default function AdminDashboard() {
                       >
                         <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[11px] font-semibold">
-                                📁 {campaign.folder || "Общие опросы"}
-                              </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                value={(campaign.folder || "Общие опросы").trim()}
+                                onChange={(e) =>
+                                  handleMovePollToFolder(campaign.id, e.target.value)
+                                }
+                                title="Переместить опрос в другую папку"
+                                className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[11px] font-semibold border border-indigo-200 cursor-pointer"
+                              >
+                                {pollFoldersList.map((f) => (
+                                  <option key={f} value={f}>
+                                    📁 {f}
+                                  </option>
+                                ))}
+                              </select>
                               <span className="text-sm font-bold text-slate-900">
                                 📊 {campaign.question}
                               </span>
