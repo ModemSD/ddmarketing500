@@ -68,6 +68,7 @@ export interface BotFeedMessage {
 const KV_KEY = "bot500:chats";
 const KV_POLLS_KEY = "bot500:polls";
 const KV_FEED_KEY = "bot500:feed";
+const KV_PAUSED_KEY = "bot500:paused";
 
 function getRedis(): Redis | null {
   const url =
@@ -528,5 +529,38 @@ export async function addIncomingFeedMessage(item: BotFeedMessage): Promise<BotF
   await saveAllFeedMessages(trimmed);
   return trimmed;
 }
+
+export async function getBotPaused(): Promise<boolean> {
+  const redis = getRedis();
+  if (redis) {
+    const val = await redis.get<boolean>(KV_PAUSED_KEY);
+    return Boolean(val);
+  }
+  const isVercel = Boolean(process.env.VERCEL);
+  const dir = isVercel ? "/tmp" : path.join(process.cwd(), "data");
+  const filePath = path.join(dir, "paused.json");
+  if (!fs.existsSync(filePath)) return false;
+  try {
+    return Boolean(JSON.parse(fs.readFileSync(filePath, "utf-8")));
+  } catch {
+    return false;
+  }
+}
+
+export async function setBotPaused(paused: boolean): Promise<boolean> {
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(KV_PAUSED_KEY, paused);
+    return paused;
+  }
+  const isVercel = Boolean(process.env.VERCEL);
+  const dir = isVercel ? "/tmp" : path.join(process.cwd(), "data");
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(dir, "paused.json"), JSON.stringify(paused), "utf-8");
+  return paused;
+}
+
 
 

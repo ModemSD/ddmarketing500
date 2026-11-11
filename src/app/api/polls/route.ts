@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addPollCampaign,
   getAllPolls,
+  getBotPaused,
   PollCampaign,
   PollChatInstance,
   saveAllPolls,
@@ -313,6 +314,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (await getBotPaused()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "🛑 Бот остановлен аварийной кнопкой СТОП! Нажмите «Возобновить работу бота» в верхней шапке кабинета.",
+        },
+        { status: 403 }
+      );
+    }
+
     const campaignChats: Record<string, PollChatInstance> = {};
     const results: Array<{
       projectId: string;
@@ -323,6 +335,17 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     for (let i = 0; i < targets.length; i++) {
+      if (i > 0 && i % 3 === 0 && (await getBotPaused())) {
+        results.push({
+          projectId: targets[i].projectId,
+          chatId: targets[i].chatId,
+          title: targets[i].title,
+          ok: false,
+          error: "🛑 Остановлено аварийной кнопкой СТОП",
+        });
+        break;
+      }
+
       const t = targets[i];
       const personalizedQuestion = question
         .replace(/\{ID\}/gi, t.projectId)

@@ -3,9 +3,11 @@ import {
   addIncomingFeedMessage,
   extractProjectIdFromTitle,
   getAllChats,
+  getBotPaused,
   normalizeChatIdString,
   removeChat,
   saveAllChats,
+  setBotPaused,
   StartupChat,
   upsertChat,
   updatePollAnswerFromTelegram,
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   const chats = await getAllChats();
+  const botPaused = await getBotPaused();
   const hasKv = Boolean(
     (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
       (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
@@ -36,6 +39,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     chats,
+    botPaused,
     hasKv,
     hasBotToken,
     defaultSheetUrl: process.env.DEFAULT_SHEET_URL || "",
@@ -231,6 +235,36 @@ export async function POST(req: NextRequest) {
         );
       }
       return NextResponse.json({ ok: true, description: data.description });
+    }
+
+    // 6. Аварийная остановка / возобновление всех процессов бота (Emergency Kill Switch)
+    if (action === "toggle_pause") {
+      const { paused, webhookUrl, botToken } = body as {
+        paused: boolean;
+        webhookUrl?: string;
+        botToken?: string;
+      };
+      const token = getBotToken(botToken);
+      const nextPaused = await setBotPaused(Boolean(paused));
+
+      if (nextPaused) {
+        // Отключаем вебхук Telegram при экстренной остановке
+        await fetch(
+          `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`
+        ).catch(() => {});
+      } else if (webhookUrl) {
+        // При возобновлении работы снова включаем вебхук
+        const allowed = encodeURIComponent(
+          JSON.stringify(["message", "my_chat_member", "channel_post", "poll", "poll_answer"])
+        );
+        await fetch(
+          `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(
+            webhookUrl
+          )}&allowed_updates=${allowed}`
+        ).catch(() => {});
+      }
+
+      return NextResponse.json({ ok: true, botPaused: nextPaused });
     }
 
     return NextResponse.json({ ok: false, error: "Неизвестное действие" }, { status: 400 });

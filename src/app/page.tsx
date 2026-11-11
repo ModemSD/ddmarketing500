@@ -28,6 +28,8 @@ import {
   LogOut,
   MessageSquare,
   CornerDownRight,
+  OctagonX,
+  Play,
 } from "lucide-react";
 
 interface StartupChat {
@@ -159,6 +161,8 @@ export default function AdminDashboard() {
   const [customBotToken, setCustomBotToken] = useState("");
   const [hasServerBotToken, setHasServerBotToken] = useState(false);
   const [hasKv, setHasKv] = useState(false);
+  const [botPaused, setBotPaused] = useState(false);
+  const [togglingPause, setTogglingPause] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   // Чаты стартапов
@@ -595,6 +599,7 @@ export default function AdminDashboard() {
       setAuthStatus("authenticated");
       setLoginError(null);
       setHasKv(Boolean(data.hasKv));
+      setBotPaused(Boolean(data.botPaused));
       setHasServerBotToken(Boolean(data.hasBotToken));
       if (!currentSheetUrl && data.defaultSheetUrl) {
         setSheetUrl(data.defaultSheetUrl);
@@ -652,6 +657,39 @@ export default function AdminDashboard() {
     setAdminPassword("");
     setLoginInput("");
     setAuthStatus("unauthenticated");
+  }
+
+  async function handleToggleEmergencyPause() {
+    const nextState = !botPaused;
+    setTogglingPause(true);
+    try {
+      const res = await fetch("/api/chats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "toggle_pause",
+          paused: nextState,
+          webhookUrl: `${window.location.origin}/api/webhook`,
+          botToken: customBotToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBotPaused(Boolean(data.botPaused));
+        setSending(false);
+        setStatusMessage({
+          type: data.botPaused ? "error" : "success",
+          text: data.botPaused
+            ? "🛑 ЭКСТРЕННАЯ ОСТАНОВКА АКТИВИРОВАНА: Вебхук отключён, любые рассылки и опросы заблокированы!"
+            : "✅ Работа бота и вебхука полностью возобновлена!",
+        });
+      }
+    } finally {
+      setTogglingPause(false);
+    }
   }
 
   // Авто-обновление ленты ответов (Фида) каждые 5 секунд, пока открыта вкладка "feed"
@@ -1686,6 +1724,34 @@ export default function AdminDashboard() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              disabled={togglingPause}
+              onClick={handleToggleEmergencyPause}
+              title={
+                botPaused
+                  ? "Включить бота и восстановить Webhook"
+                  : "Экстренно остановить все процессы, рассылки и отключить Webhook"
+              }
+              className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg border transition cursor-pointer disabled:opacity-50 ${
+                botPaused
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-sm animate-pulse"
+                  : "bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-sm"
+              }`}
+            >
+              {botPaused ? (
+                <>
+                  <Play className="w-4 h-4" />
+                  Включить бота
+                </>
+              ) : (
+                <>
+                  <OctagonX className="w-4 h-4" />
+                  СТОП-КРАН
+                </>
+              )}
+            </button>
+
+            <button
               onClick={() => setShowSettings(!showSettings)}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
             >
@@ -1704,6 +1770,22 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        {/* Баннер, если активен аварийный стоп-кран */}
+        {botPaused && (
+          <div className="bg-rose-600 text-white px-4 py-2.5 text-xs font-semibold flex flex-wrap items-center justify-center gap-3">
+            <span>
+              🛑 ВНИМАНИЕ: Активирован аварийный СТОП-КРАН! Вебхук Telegram отключён, любые отправки сообщений и опросов заблокированы.
+            </span>
+            <button
+              type="button"
+              onClick={handleToggleEmergencyPause}
+              className="px-3 py-1 rounded-md bg-white text-rose-700 font-bold hover:bg-rose-50 cursor-pointer"
+            >
+              Возобновить работу бота
+            </button>
+          </div>
+        )}
 
         {/* Выпадающая панель настроек */}
         {showSettings && (

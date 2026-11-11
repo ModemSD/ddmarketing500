@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addIncomingFeedMessage,
   extractProjectIdFromTitle,
+  getBotPaused,
   normalizeChatIdString,
   upsertChat,
   updatePollAnswerFromTelegram,
@@ -17,6 +18,9 @@ import { TelegramUpdate } from "@/lib/telegram";
  */
 export async function POST(req: NextRequest) {
   try {
+    if (await getBotPaused()) {
+      return NextResponse.json({ ok: true, paused: true });
+    }
     const update = (await req.json()) as TelegramUpdate;
 
     // 1. Обработка чата (только когда бота добавили в группу или переименовали чат — не пересохраняем на каждое обычное сообщение)

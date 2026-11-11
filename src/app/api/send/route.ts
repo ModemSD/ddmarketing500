@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBotPaused } from "@/lib/storage";
 import { deleteTelegramMessage, sendTelegramMessage, sleep } from "@/lib/telegram";
 
 function checkAuth(req: NextRequest): boolean {
@@ -86,6 +87,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (await getBotPaused()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "🛑 Бот остановлен аварийной кнопкой СТОП! Нажмите «Возобновить работу бота» в верхней шапке кабинета.",
+        },
+        { status: 403 }
+      );
+    }
+
     const results: Array<{
       projectId: string;
       chatId: string;
@@ -97,6 +109,18 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     for (let i = 0; i < messages.length; i++) {
+      // На каждом 3-м сообщении проверяем, не нажал ли админ кнопку СТОП прямо во время рассылки
+      if (i > 0 && i % 3 === 0 && (await getBotPaused())) {
+        results.push({
+          projectId: messages[i].projectId,
+          chatId: messages[i].chatId,
+          title: messages[i].title,
+          ok: false,
+          error: "🛑 Остановлено аварийной кнопкой СТОП",
+        });
+        break;
+      }
+
       const item = messages[i];
       if (!item.chatId || !item.text?.trim()) {
         results.push({
