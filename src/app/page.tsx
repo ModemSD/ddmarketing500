@@ -56,6 +56,12 @@ interface ConfirmModalState {
   messages: QueuedMessage[];
 }
 
+function normalizeDash(str: string): string {
+  return String(str)
+    .trim()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+}
+
 function columnLetterToIndex(letter: string): number {
   const clean = letter.trim().toUpperCase();
   let index = 0;
@@ -175,7 +181,13 @@ export default function AdminDashboard() {
       }
 
       const serverChats: Record<string, StartupChat> = data.chats || {};
-      const merged = { ...localBackup, ...serverChats };
+      const merged: Record<string, StartupChat> = { ...localBackup, ...serverChats };
+      for (const key of Object.keys(merged)) {
+        merged[key] = {
+          ...merged[key],
+          chatId: normalizeDash(merged[key].chatId),
+        };
+      }
       setChats(merged);
 
       if (selectedProjectIds.size === 0 && Object.keys(merged).length > 0) {
@@ -650,7 +662,7 @@ export default function AdminDashboard() {
       const parts = trimmed.split(/[\s,;|\t]+/);
       if (parts.length >= 2) {
         const projectId = parts[0].trim();
-        const chatId = parts[1].trim();
+        const chatId = normalizeDash(parts[1]);
         const title = parts.slice(2).join(" ") || `${projectId} Marketing Unit`;
         items.push({
           projectId,

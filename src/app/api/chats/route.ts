@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   extractProjectIdFromTitle,
   getAllChats,
+  normalizeChatIdString,
   removeChat,
   saveAllChats,
   StartupChat,
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         if (item.projectId && item.chatId) {
           chats[String(item.projectId).trim()] = {
             projectId: String(item.projectId).trim(),
-            chatId: String(item.chatId).trim(),
+            chatId: normalizeChatIdString(item.chatId),
             title: item.title || `${item.projectId} Marketing Unit`,
             updatedAt: new Date().toISOString(),
           };

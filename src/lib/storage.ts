@@ -82,9 +82,18 @@ export async function saveAllChats(chats: Record<string, StartupChat>): Promise<
   fs.writeFileSync(filePath, JSON.stringify(chats, null, 2), "utf-8");
 }
 
+export function normalizeChatIdString(chatId: string | number): string {
+  return String(chatId)
+    .trim()
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+}
+
 export async function upsertChat(chat: StartupChat): Promise<Record<string, StartupChat>> {
   const chats = await getAllChats();
-  chats[chat.projectId] = chat;
+  chats[chat.projectId] = {
+    ...chat,
+    chatId: normalizeChatIdString(chat.chatId),
+  };
   await saveAllChats(chats);
   return chats;
 }
