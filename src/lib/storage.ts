@@ -247,11 +247,11 @@ const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
         chatId: "-5560094301",
         chatTitle: "26666 Marketing Unit",
         messageId: 18,
-        totalVoterCount: 1,
+        totalVoterCount: 2,
         options: [
           { text: "Да, всё готово", voterCount: 1 },
           { text: "В процессе", voterCount: 0 },
-          { text: "Нужна помощь", voterCount: 0 },
+          { text: "Нужна помощь", voterCount: 1 },
         ],
         voters: {
           "308047978": {
@@ -261,8 +261,15 @@ const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
             optionIds: [0],
             votedAt: "2026-11-11T12:34:00.000Z",
           },
+          "1145547373": {
+            userId: "1145547373",
+            name: "Dmitrii",
+            username: "envyzzz",
+            optionIds: [2],
+            votedAt: "2026-11-11T13:02:15.000Z",
+          },
         },
-        updatedAt: "2026-11-11T12:34:00.000Z",
+        updatedAt: "2026-11-11T13:02:15.000Z",
       },
     },
   },
