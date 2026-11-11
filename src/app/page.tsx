@@ -22,6 +22,8 @@ import {
   X,
   BarChart3,
   Pin,
+  Folder,
+  Filter,
 } from "lucide-react";
 
 interface StartupChat {
@@ -85,6 +87,7 @@ interface PollChatInstance {
 
 interface PollCampaign {
   id: string;
+  folder?: string;
   question: string;
   options: string[];
   isAnonymous: boolean;
@@ -154,13 +157,16 @@ export default function AdminDashboard() {
   const [parseMode, setParseMode] = useState<"HTML" | "Markdown" | "">("HTML");
 
   // Вкладка 3: Опросы (Polls)
+  const [pollFolder, setPollFolder] = useState("Неделя 1");
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["Да, всё готово", "В процессе", "Нужна помощь"]);
   const [pollIsAnonymous, setPollIsAnonymous] = useState(false);
   const [pollMultiple, setPollMultiple] = useState(false);
-  const [pollPinMessage, setPollPinMessage] = useState(true);
+  const [pollPinMessage, setPollPinMessage] = useState(false); // По умолчанию НЕ закрепляем
   const [pollsHistory, setPollsHistory] = useState<PollCampaign[]>([]);
   const [loadingPolls, setLoadingPolls] = useState(false);
+  const [selectedPollFolderFilter, setSelectedPollFolderFilter] = useState<string>("ALL");
+  const [selectedPollProjectFilter, setSelectedPollProjectFilter] = useState<string>("ALL");
 
   // Модальное окно подтверждения отправки (вместо системного window.confirm)
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
@@ -180,6 +186,7 @@ export default function AdminDashboard() {
     const savedSheetUrl = localStorage.getItem("bot500_sheet_url") || "";
     const savedTemplate = localStorage.getItem("bot500_sheet_template");
     const savedLocalChats = localStorage.getItem("bot500_local_chats_backup");
+    const savedLocalPolls = localStorage.getItem("bot500_local_polls_backup");
 
     if (savedPass) setAdminPassword(savedPass);
     if (savedToken) setCustomBotToken(savedToken);
@@ -195,19 +202,49 @@ export default function AdminDashboard() {
       }
     }
 
+    let initialPollsBackup: PollCampaign[] = [];
+    if (savedLocalPolls) {
+      try {
+        initialPollsBackup = JSON.parse(savedLocalPolls);
+        setPollsHistory(initialPollsBackup);
+      } catch {
+        // ignore
+      }
+    }
+
     fetchChats(savedPass, initialBackup, savedSheetUrl);
-    fetchPolls(savedPass);
+    fetchPolls(savedPass, initialPollsBackup, savedToken);
   }, []);
 
-  async function fetchPolls(pass = adminPassword) {
+  // Сохраняем бэкап опросов в localStorage браузера
+  useEffect(() => {
+    if (pollsHistory.length > 0) {
+      localStorage.setItem("bot500_local_polls_backup", JSON.stringify(pollsHistory));
+    }
+  }, [pollsHistory]);
+
+  async function fetchPolls(
+    pass = adminPassword,
+    localPolls: PollCampaign[] = pollsHistory,
+    tokenOverride = customBotToken
+  ) {
     setLoadingPolls(true);
     try {
       const res = await fetch("/api/polls", {
-        headers: { "x-admin-password": pass },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": pass,
+        },
+        body: JSON.stringify({
+          action: "sync_votes",
+          clientPolls: localPolls,
+          botToken: tokenOverride || undefined,
+        }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setPollsHistory(data.polls || []);
+      if (data.ok && Array.isArray(data.polls)) {
+        setPollsHistory(data.polls);
       }
     } catch {
       // ignore
@@ -248,12 +285,14 @@ export default function AdminDashboard() {
           "x-admin-password": adminPassword,
         },
         body: JSON.stringify({
+          folder: pollFolder.trim() || "Общие опросы",
           question: pollQuestion.trim(),
           options: cleanOptions,
           isAnonymous: pollIsAnonymous,
           allowsMultipleAnswers: pollMultiple,
           pinMessage: pollPinMessage,
           targets,
+          clientPolls: pollsHistory,
           botToken: customBotToken || undefined,
         }),
       });
@@ -280,13 +319,21 @@ export default function AdminDashboard() {
   }
 
   async function handleDeletePollCampaign(pollCampaignId: string) {
+    const nextLocal = pollsHistory.filter((p) => p.id !== pollCampaignId);
+    setPollsHistory(nextLocal);
+    localStorage.setItem("bot500_local_polls_backup", JSON.stringify(nextLocal));
+
     const res = await fetch("/api/polls", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-admin-password": adminPassword,
       },
-      body: JSON.stringify({ action: "delete", pollCampaignId }),
+      body: JSON.stringify({
+        action: "delete",
+        pollCampaignId,
+        clientPolls: nextLocal,
+      }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -295,28 +342,35 @@ export default function AdminDashboard() {
   }
 
   async function handleRefreshPollResults() {
-    setLoadingPolls(true);
-    try {
-      await fetch("/api/chats", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword,
-        },
-        body: JSON.stringify({
-          action: "sync_updates",
-          botToken: customBotToken || undefined,
-        }),
-      });
-      await fetchPolls();
-      setStatusMessage({
-        type: "success",
-        text: "Результаты голосования синхронизированы из Telegram!",
-      });
-    } finally {
-      setLoadingPolls(false);
-    }
+    await fetchPolls(adminPassword, pollsHistory, customBotToken);
+    setStatusMessage({
+      type: "success",
+      text: "Голоса и ответы успешно обновлены из Telegram!",
+    });
   }
+
+  // Список всех папок опросов
+  const pollFoldersList = useMemo(() => {
+    const set = new Set<string>(["Неделя 1", "Неделя 2", "Маркетинг", "Отчёты"]);
+    for (const p of pollsHistory) {
+      set.add((p.folder || "Общие опросы").trim());
+    }
+    return Array.from(set);
+  }, [pollsHistory]);
+
+  // Отфильтрованные опросы по выбранной папке и по выбранному проекту (стартапу)
+  const filteredPollsHistory = useMemo(() => {
+    return pollsHistory.filter((p) => {
+      const folderName = (p.folder || "Общие опросы").trim();
+      if (selectedPollFolderFilter !== "ALL" && folderName !== selectedPollFolderFilter) {
+        return false;
+      }
+      if (selectedPollProjectFilter !== "ALL") {
+        return Boolean(p.chats && p.chats[selectedPollProjectFilter]);
+      }
+      return true;
+    });
+  }, [pollsHistory, selectedPollFolderFilter, selectedPollProjectFilter]);
 
   // Сохраняем бэкап чатов в localStorage браузера
   useEffect(() => {
@@ -1760,17 +1814,38 @@ export default function AdminDashboard() {
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Вопрос опроса (до 300 символов)
-                  </label>
-                  <input
-                    type="text"
-                    value={pollQuestion}
-                    onChange={(e) => setPollQuestion(e.target.value)}
-                    placeholder="Например: Отправили ли вы еженедельный отчёт по проекту #{ID}?"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-4">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Папка / Кампания опроса
+                    </label>
+                    <input
+                      type="text"
+                      list="poll-folders-datalist"
+                      value={pollFolder}
+                      onChange={(e) => setPollFolder(e.target.value)}
+                      placeholder="Неделя 1, Чек-ин..."
+                      className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
+                    />
+                    <datalist id="poll-folders-datalist">
+                      {pollFoldersList.map((f) => (
+                        <option key={f} value={f} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div className="sm:col-span-8">
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Вопрос опроса (до 300 символов)
+                    </label>
+                    <input
+                      type="text"
+                      value={pollQuestion}
+                      onChange={(e) => setPollQuestion(e.target.value)}
+                      placeholder="Например: Отправили ли вы еженедельный отчёт по проекту #{ID}?"
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1873,39 +1948,109 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Сводная таблица результатов по отправленным опросам */}
+            {/* Сводная таблица результатов по отправленным опросам с папками и фильтром по стартапам */}
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">
-                    Сводные результаты опросов по чатам ({pollsHistory.length})
+                    Сводные результаты опросов ({filteredPollsHistory.length} из {pollsHistory.length})
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Результаты видно и внутри каждого Telegram-чата, и в этой сводной таблице по всем стартапам.
+                    Фильтруйте опросы по папкам (неделям/темам) или выберите конкретный проект, чтобы увидеть все его ответы:
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleRefreshPollResults}
                   disabled={loadingPolls}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingPolls ? "animate-spin" : ""}`} />
                   Обновить голоса из Telegram
                 </button>
               </div>
 
-              {pollsHistory.length === 0 ? (
+              {/* Панель папок и фильтра по конкретному стартапу */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                {/* Папки */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-medium text-slate-500 flex items-center gap-1 mr-1">
+                    <Folder className="w-3.5 h-3.5 text-indigo-600" />
+                    Папки:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPollFolderFilter("ALL")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                      selectedPollFolderFilter === "ALL"
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Все папки ({pollsHistory.length})
+                  </button>
+                  {Array.from(
+                    new Set(pollsHistory.map((p) => (p.folder || "Общие опросы").trim()))
+                  ).map((folderName) => {
+                    const count = pollsHistory.filter(
+                      (p) => (p.folder || "Общие опросы").trim() === folderName
+                    ).length;
+                    const active = selectedPollFolderFilter === folderName;
+                    return (
+                      <button
+                        key={folderName}
+                        type="button"
+                        onClick={() => setSelectedPollFolderFilter(folderName)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                          active
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        📁 {folderName} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Фильтр по конкретному стартапу */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                    <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                    Фильтр по проекту:
+                  </span>
+                  <select
+                    value={selectedPollProjectFilter}
+                    onChange={(e) => setSelectedPollProjectFilter(e.target.value)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white"
+                  >
+                    <option value="ALL">Все стартапы ({Object.keys(chats).length})</option>
+                    {chatList.map((c) => (
+                      <option key={c.projectId} value={c.projectId}>
+                        #{c.projectId} — {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {filteredPollsHistory.length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
-                  Вы ещё не отправляли опросов. Создайте первый опрос выше — и здесь появится сводная статистика ответов по каждому стартапу!
+                  По выбранному фильтру пока нет опросов.
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {pollsHistory.map((campaign) => {
-                    const chatEntries = Object.values(campaign.chats).sort((a, b) =>
+                  {filteredPollsHistory.map((campaign) => {
+                    const allChatEntries = Object.values(campaign.chats || {}).sort((a, b) =>
                       a.projectId.localeCompare(b.projectId)
                     );
-                    const answeredChatsCount = chatEntries.filter(
+                    const chatEntries =
+                      selectedPollProjectFilter === "ALL"
+                        ? allChatEntries
+                        : allChatEntries.filter(
+                            (c) => c.projectId === selectedPollProjectFilter
+                          );
+                    const answeredChatsCount = allChatEntries.filter(
                       (c) => c.totalVoterCount > 0 || Object.keys(c.voters || {}).length > 0
                     ).length;
 
@@ -1916,14 +2061,19 @@ export default function AdminDashboard() {
                       >
                         <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <div className="text-sm font-bold text-slate-900">
-                              📊 {campaign.question}
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[11px] font-semibold">
+                                📁 {campaign.folder || "Общие опросы"}
+                              </span>
+                              <span className="text-sm font-bold text-slate-900">
+                                📊 {campaign.question}
+                              </span>
                             </div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
+                            <div className="text-[11px] text-slate-500 mt-1">
                               Отправлено: {new Date(campaign.createdAt).toLocaleString("ru-RU")} •
                               Ответили стартапов:{" "}
                               <b className="text-emerald-700">
-                                {answeredChatsCount} из {chatEntries.length}
+                                {answeredChatsCount} из {allChatEntries.length}
                               </b>
                             </div>
                           </div>

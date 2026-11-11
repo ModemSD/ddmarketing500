@@ -36,6 +36,7 @@ export interface PollChatInstance {
 
 export interface PollCampaign {
   id: string;
+  folder: string; // Папка / категория опроса, например "Еженедельные чекины" или "11.11.2026"
   question: string;
   options: string[];
   isAnonymous: boolean;
@@ -150,22 +151,83 @@ function getLocalPollsFilePath(): string {
   return path.join(dir, "polls.json");
 }
 
+const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
+  {
+    id: "poll_initial_kak_dela",
+    folder: "Неделя 1",
+    question: "Как дела?",
+    options: ["Да, всё готово", "В процессе", "Нужна помощь"],
+    isAnonymous: false,
+    allowsMultipleAnswers: false,
+    createdAt: "2026-11-11T12:33:29.000Z",
+    chats: {
+      "25555": {
+        pollId: "5449755947444476064",
+        projectId: "25555",
+        chatId: "-5257696187",
+        chatTitle: "25555 Marketing Unit",
+        messageId: 16,
+        totalVoterCount: 1,
+        options: [
+          { text: "Да, всё готово", voterCount: 0 },
+          { text: "В процессе", voterCount: 0 },
+          { text: "Нужна помощь", voterCount: 1 },
+        ],
+        voters: {
+          "308047978": {
+            userId: "308047978",
+            name: "Dmitrii Manapov",
+            username: "dmanapoff",
+            optionIds: [2],
+            votedAt: "2026-11-11T12:34:00.000Z",
+          },
+        },
+        updatedAt: "2026-11-11T12:34:00.000Z",
+      },
+      "26666": {
+        pollId: "5449675721750353617",
+        projectId: "26666",
+        chatId: "-5560094301",
+        chatTitle: "26666 Marketing Unit",
+        messageId: 18,
+        totalVoterCount: 1,
+        options: [
+          { text: "Да, всё готово", voterCount: 1 },
+          { text: "В процессе", voterCount: 0 },
+          { text: "Нужна помощь", voterCount: 0 },
+        ],
+        voters: {
+          "308047978": {
+            userId: "308047978",
+            name: "Dmitrii Manapov",
+            username: "dmanapoff",
+            optionIds: [0],
+            votedAt: "2026-11-11T12:34:00.000Z",
+          },
+        },
+        updatedAt: "2026-11-11T12:34:00.000Z",
+      },
+    },
+  },
+];
+
 export async function getAllPolls(): Promise<PollCampaign[]> {
   const redis = getRedis();
   if (redis) {
     const data = await redis.get<PollCampaign[]>(KV_POLLS_KEY);
-    return data || [];
+    return data && data.length > 0 ? data : DEFAULT_INITIAL_POLLS;
   }
 
   const filePath = getLocalPollsFilePath();
   if (!fs.existsSync(filePath)) {
-    return [];
+    return [...DEFAULT_INITIAL_POLLS];
   }
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as PollCampaign[];
+    const parsed = JSON.parse(raw) as PollCampaign[];
+    return parsed && parsed.length > 0 ? parsed : [...DEFAULT_INITIAL_POLLS];
   } catch {
-    return [];
+    return [...DEFAULT_INITIAL_POLLS];
   }
 }
 
