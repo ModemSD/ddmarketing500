@@ -7,6 +7,8 @@ import {
   saveAllChats,
   StartupChat,
   upsertChat,
+  updatePollAnswerFromTelegram,
+  updatePollStateFromTelegram,
 } from "@/lib/storage";
 import { getBotToken, TelegramUpdate } from "@/lib/telegram";
 
@@ -132,6 +134,22 @@ export async function POST(req: NextRequest) {
             };
             foundCount++;
           }
+        }
+
+        if (u.poll) {
+          await updatePollStateFromTelegram(
+            u.poll.id,
+            u.poll.options.map((o) => ({ text: o.text, voterCount: o.voter_count })),
+            u.poll.total_voter_count
+          );
+        }
+
+        if (u.poll_answer && u.poll_answer.user) {
+          await updatePollAnswerFromTelegram(
+            u.poll_answer.poll_id,
+            u.poll_answer.user,
+            u.poll_answer.option_ids || []
+          );
         }
       }
       await saveAllChats(chats);

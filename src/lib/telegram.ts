@@ -4,6 +4,26 @@ export interface TelegramChatObj {
   type: string;
 }
 
+export interface TelegramPollObj {
+  id: string;
+  question: string;
+  options: Array<{ text: string; voter_count: number }>;
+  total_voter_count: number;
+  is_closed: boolean;
+  is_anonymous: boolean;
+}
+
+export interface TelegramPollAnswerObj {
+  poll_id: string;
+  user?: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+  };
+  option_ids: number[];
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -11,6 +31,7 @@ export interface TelegramUpdate {
     chat: TelegramChatObj;
     text?: string;
     new_chat_title?: string;
+    poll?: TelegramPollObj;
   };
   my_chat_member?: {
     chat: TelegramChatObj;
@@ -22,6 +43,8 @@ export interface TelegramUpdate {
     chat: TelegramChatObj;
     text?: string;
   };
+  poll?: TelegramPollObj;
+  poll_answer?: TelegramPollAnswerObj;
 }
 
 const FALLBACK_BOT_TOKEN = "9223435288:AAHbLDSDvrIIWzN0OVaG9aS2dls_ktAvXYg";
@@ -101,5 +124,83 @@ export async function sendTelegramMessage(
 
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export interface SendPollParams {
+  chatId: string | number;
+  question: string;
+  options: string[];
+  isAnonymous?: boolean;
+  allowsMultipleAnswers?: boolean;
+  pinMessage?: boolean;
+  overrideToken?: string;
+}
+
+export async function sendTelegramPoll(params: SendPollParams): Promise<{
+  ok: boolean;
+  pollId?: string;
+  messageId?: number;
+  error?: string;
+}> {
+  try {
+    const primaryToken = getBotToken(params.overrideToken);
+    const cleanChatId = normalizeChatId(params.chatId);
+
+    const payload = {
+      chat_id: cleanChatId,
+      question: params.question.slice(0, 300),
+      options: params.options.map((o) => ({ text: o.trim().slice(0, 100) })),
+      is_anonymous: params.isAnonymous ?? false,
+      allows_multiple_answers: params.allowsMultipleAnswers ?? false,
+    };
+
+    let tokenToUse = primaryToken;
+    let res = await fetch(`https://api.telegram.org/bot${tokenToUse}/sendPoll`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let data = await res.json();
+
+    if (!data.ok && tokenToUse !== FALLBACK_BOT_TOKEN) {
+      tokenToUse = FALLBACK_BOT_TOKEN;
+      res = await fetch(`https://api.telegram.org/bot${tokenToUse}/sendPoll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      data = await res.json();
+    }
+
+    if (!data.ok) {
+      return { ok: false, error: data.description || "Ошибка отправки опроса" };
+    }
+
+    const messageId = data.result?.message_id as number | undefined;
+    const pollId = data.result?.poll?.id as string | undefined;
+
+    if (params.pinMessage && messageId) {
+      await fetch(`https://api.telegram.org/bot${tokenToUse}/pinChatMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: cleanChatId,
+          message_id: messageId,
+          disable_notification: false,
+        }),
+      }).catch(() => {});
+    }
+
+    return {
+      ok: true,
+      pollId,
+      messageId,
+    };
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Неизвестная ошибка при отправке опроса",
+    };
+  }
 }
 

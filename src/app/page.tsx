@@ -20,6 +20,8 @@ import {
   Eye,
   Link2,
   X,
+  BarChart3,
+  Pin,
 } from "lucide-react";
 
 interface StartupChat {
@@ -56,6 +58,41 @@ interface ConfirmModalState {
   messages: QueuedMessage[];
 }
 
+interface PollOptionStat {
+  text: string;
+  voterCount: number;
+}
+
+interface PollVoteUser {
+  userId: string;
+  name: string;
+  username?: string;
+  optionIds: number[];
+  votedAt: string;
+}
+
+interface PollChatInstance {
+  pollId: string;
+  projectId: string;
+  chatId: string;
+  chatTitle: string;
+  messageId?: number;
+  totalVoterCount: number;
+  options: PollOptionStat[];
+  voters: Record<string, PollVoteUser>;
+  updatedAt: string;
+}
+
+interface PollCampaign {
+  id: string;
+  question: string;
+  options: string[];
+  isAnonymous: boolean;
+  allowsMultipleAnswers: boolean;
+  createdAt: string;
+  chats: Record<string, PollChatInstance>;
+}
+
 function normalizeDash(str: string): string {
   const digits = String(str).replace(/\D/g, "");
   if (!digits) return String(str).trim();
@@ -72,7 +109,7 @@ function columnLetterToIndex(letter: string): number {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"sheet" | "broadcast" | "chats">("sheet");
+  const [activeTab, setActiveTab] = useState<"sheet" | "broadcast" | "polls" | "chats">("sheet");
 
   // Авторизация и настройки
   const [adminPassword, setAdminPassword] = useState("");
@@ -116,6 +153,15 @@ export default function AdminDashboard() {
   const [broadcastText, setBroadcastText] = useState("");
   const [parseMode, setParseMode] = useState<"HTML" | "Markdown" | "">("HTML");
 
+  // Вкладка 3: Опросы (Polls)
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["Да, всё готово", "В процессе", "Нужна помощь"]);
+  const [pollIsAnonymous, setPollIsAnonymous] = useState(false);
+  const [pollMultiple, setPollMultiple] = useState(false);
+  const [pollPinMessage, setPollPinMessage] = useState(true);
+  const [pollsHistory, setPollsHistory] = useState<PollCampaign[]>([]);
+  const [loadingPolls, setLoadingPolls] = useState(false);
+
   // Модальное окно подтверждения отправки (вместо системного window.confirm)
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
 
@@ -150,7 +196,127 @@ export default function AdminDashboard() {
     }
 
     fetchChats(savedPass, initialBackup, savedSheetUrl);
+    fetchPolls(savedPass);
   }, []);
+
+  async function fetchPolls(pass = adminPassword) {
+    setLoadingPolls(true);
+    try {
+      const res = await fetch("/api/polls", {
+        headers: { "x-admin-password": pass },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPollsHistory(data.polls || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingPolls(false);
+    }
+  }
+
+  async function handleSendPoll() {
+    const cleanOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!pollQuestion.trim()) {
+      setStatusMessage({ type: "error", text: "Введите вопрос опроса" });
+      return;
+    }
+    if (cleanOptions.length < 2) {
+      setStatusMessage({ type: "error", text: "Добавьте минимум 2 варианта ответа" });
+      return;
+    }
+
+    const targets = Object.values(chats).filter((c) => selectedProjectIds.has(c.projectId));
+    if (targets.length === 0) {
+      setStatusMessage({ type: "error", text: "Выберите хотя бы один чат стартапа" });
+      return;
+    }
+
+    setSending(true);
+    setSendResults(null);
+    setStatusMessage({
+      type: "info",
+      text: `Отправка опроса в ${targets.length} чатов...`,
+    });
+
+    try {
+      const res = await fetch("/api/polls", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          question: pollQuestion.trim(),
+          options: cleanOptions,
+          isAnonymous: pollIsAnonymous,
+          allowsMultipleAnswers: pollMultiple,
+          pinMessage: pollPinMessage,
+          targets,
+          botToken: customBotToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatusMessage({ type: "error", text: data.error || "Ошибка отправки опроса" });
+        return;
+      }
+
+      if (data.polls) setPollsHistory(data.polls);
+      setSendResults(data.results || []);
+      setStatusMessage({
+        type: data.failCount === 0 ? "success" : "info",
+        text: `Опрос отправлен! Успешно: ${data.successCount}, Ошибок: ${data.failCount}`,
+      });
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Ошибка сети",
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDeletePollCampaign(pollCampaignId: string) {
+    const res = await fetch("/api/polls", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({ action: "delete", pollCampaignId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setPollsHistory(data.polls || []);
+    }
+  }
+
+  async function handleRefreshPollResults() {
+    setLoadingPolls(true);
+    try {
+      await fetch("/api/chats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "sync_updates",
+          botToken: customBotToken || undefined,
+        }),
+      });
+      await fetchPolls();
+      setStatusMessage({
+        type: "success",
+        text: "Результаты голосования синхронизированы из Telegram!",
+      });
+    } finally {
+      setLoadingPolls(false);
+    }
+  }
 
   // Сохраняем бэкап чатов в localStorage браузера
   useEffect(() => {
@@ -828,6 +994,17 @@ export default function AdminDashboard() {
               Общее сообщение
             </button>
             <button
+              onClick={() => setActiveTab("polls")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition ${
+                activeTab === "polls"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Опросы
+            </button>
+            <button
               onClick={() => setActiveTab("chats")}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition ${
                 activeTab === "chats"
@@ -1491,6 +1668,356 @@ export default function AdminDashboard() {
                     : `Отправить в ${selectedProjectIds.size} чатов`}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ВКЛАДКА: ОПРОСЫ И РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ */}
+        {activeTab === "polls" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Левая колонка: выбор получателей */}
+              <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col max-h-[640px]">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Куда отправить опрос ({selectedProjectIds.size} из {Object.keys(chats).length})
+                  </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={selectAllFiltered}
+                      className="text-xs font-medium text-indigo-600 hover:underline"
+                    >
+                      Выбрать все
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      onClick={deselectAllFiltered}
+                      className="text-xs font-medium text-slate-500 hover:underline"
+                    >
+                      Снять все
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative mb-3">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={chatSearch}
+                    onChange={(e) => setChatSearch(e.target.value)}
+                    placeholder="Поиск по ID (30211) или названию..."
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300"
+                  />
+                </div>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                  {chatList.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400">
+                      Список чатов пуст. Добавьте чаты во вкладке «База чатов».
+                    </div>
+                  ) : (
+                    chatList.map((chat) => {
+                      const checked = selectedProjectIds.has(chat.projectId);
+                      return (
+                        <label
+                          key={chat.projectId}
+                          onClick={() => toggleChatSelection(chat.projectId)}
+                          className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer hover:bg-slate-50 transition ${
+                            checked ? "bg-indigo-50/40" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {checked ? (
+                              <CheckSquare className="w-4 h-4 text-indigo-600 shrink-0" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                            )}
+                            <div>
+                              <div className="text-xs font-semibold text-slate-900">
+                                {chat.title}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                ID проекта: {chat.projectId}
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Правая колонка: создание опроса */}
+              <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-indigo-600" />
+                    Конструктор Telegram-опроса
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Опрос придет нативной карточкой голосования в выбранные чаты. В вопросе можно использовать <code>{"{ID}"}</code> и <code>{"{TITLE}"}</code>.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Вопрос опроса (до 300 символов)
+                  </label>
+                  <input
+                    type="text"
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    placeholder="Например: Отправили ли вы еженедельный отчёт по проекту #{ID}?"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-slate-700">
+                      Варианты ответа (от 2 до 10):
+                    </label>
+                    {pollOptions.length < 10 && (
+                      <button
+                        type="button"
+                        onClick={() => setPollOptions([...pollOptions, ""])}
+                        className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Добавить вариант
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {pollOptions.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-400 w-5 text-center">
+                          {idx + 1}.
+                        </span>
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => {
+                            const next = [...pollOptions];
+                            next[idx] = e.target.value;
+                            setPollOptions(next);
+                          }}
+                          placeholder={`Вариант ответа ${idx + 1}`}
+                          className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none"
+                        />
+                        {pollOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPollOptions(pollOptions.filter((_, i) => i !== idx))
+                            }
+                            className="p-1.5 text-slate-400 hover:text-rose-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Настройки опроса */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={!pollIsAnonymous}
+                      onChange={(e) => setPollIsAnonymous(!e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600"
+                    />
+                    <span>Открытое голосование (видны имена)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={pollMultiple}
+                      onChange={(e) => setPollMultiple(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600"
+                    />
+                    <span>Можно выбрать несколько ответов</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={pollPinMessage}
+                      onChange={(e) => setPollPinMessage(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600"
+                    />
+                    <span className="flex items-center gap-1">
+                      <Pin className="w-3.5 h-3.5 text-indigo-600" />
+                      Закрепить опрос в чате
+                    </span>
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSendPoll}
+                  disabled={sending || selectedProjectIds.size === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-sm rounded-xl shadow-sm transition"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  {sending
+                    ? "Отправляем опрос..."
+                    : `Отправить опрос в выбранные чаты (${selectedProjectIds.size} шт.)`}
+                </button>
+              </div>
+            </div>
+
+            {/* Сводная таблица результатов по отправленным опросам */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Сводные результаты опросов по чатам ({pollsHistory.length})
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Результаты видно и внутри каждого Telegram-чата, и в этой сводной таблице по всем стартапам.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshPollResults}
+                  disabled={loadingPolls}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingPolls ? "animate-spin" : ""}`} />
+                  Обновить голоса из Telegram
+                </button>
+              </div>
+
+              {pollsHistory.length === 0 ? (
+                <div className="p-8 text-center border border-dashed border-slate-200 rounded-xl text-xs text-slate-400">
+                  Вы ещё не отправляли опросов. Создайте первый опрос выше — и здесь появится сводная статистика ответов по каждому стартапу!
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pollsHistory.map((campaign) => {
+                    const chatEntries = Object.values(campaign.chats).sort((a, b) =>
+                      a.projectId.localeCompare(b.projectId)
+                    );
+                    const answeredChatsCount = chatEntries.filter(
+                      (c) => c.totalVoterCount > 0 || Object.keys(c.voters || {}).length > 0
+                    ).length;
+
+                    return (
+                      <div
+                        key={campaign.id}
+                        className="border border-slate-200 rounded-2xl overflow-hidden"
+                      >
+                        <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">
+                              📊 {campaign.question}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              Отправлено: {new Date(campaign.createdAt).toLocaleString("ru-RU")} •
+                              Ответили стартапов:{" "}
+                              <b className="text-emerald-700">
+                                {answeredChatsCount} из {chatEntries.length}
+                              </b>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePollCampaign(campaign.id)}
+                            className="text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Удалить из истории
+                          </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-200 bg-white text-[11px] uppercase text-slate-500">
+                                <th className="py-2.5 px-3">Стартап</th>
+                                <th className="py-2.5 px-3">Статус</th>
+                                <th className="py-2.5 px-3">Голоса по вариантам</th>
+                                <th className="py-2.5 px-3">Кто проголосовал</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {chatEntries.map((inst) => {
+                                const votersList = Object.values(inst.voters || {});
+                                const hasVotes = inst.totalVoterCount > 0 || votersList.length > 0;
+
+                                return (
+                                  <tr key={inst.projectId} className="hover:bg-slate-50/70">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                      <span className="text-indigo-700 font-bold">
+                                        #{inst.projectId}
+                                      </span>{" "}
+                                      {inst.chatTitle}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      {hasVotes ? (
+                                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-medium text-[11px]">
+                                          ✓ Голосов: {inst.totalVoterCount}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium text-[11px]">
+                                          ⏳ Нет ответов
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {inst.options.map((o, idx) => (
+                                          <span
+                                            key={idx}
+                                            className={`px-2 py-0.5 rounded border text-[11px] ${
+                                              o.voterCount > 0
+                                                ? "bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold"
+                                                : "bg-slate-50 border-slate-200 text-slate-400"
+                                            }`}
+                                          >
+                                            {o.text}: <b>{o.voterCount}</b>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-slate-600">
+                                      {votersList.length > 0 ? (
+                                        <div className="space-y-0.5">
+                                          {votersList.map((v) => (
+                                            <div key={v.userId} className="text-[11px]">
+                                              <b>{v.name}</b>
+                                              {v.username ? ` (@${v.username})` : ""} →{" "}
+                                              <span className="text-indigo-700 font-medium">
+                                                {v.optionIds
+                                                  .map((id) => inst.options[id]?.text)
+                                                  .filter(Boolean)
+                                                  .join(", ")}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 text-[11px]">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}

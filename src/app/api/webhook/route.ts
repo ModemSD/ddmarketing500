@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractProjectIdFromTitle, upsertChat } from "@/lib/storage";
+import {
+  extractProjectIdFromTitle,
+  upsertChat,
+  updatePollAnswerFromTelegram,
+  updatePollStateFromTelegram,
+} from "@/lib/storage";
 import { TelegramUpdate } from "@/lib/telegram";
 
 /**
- * Вебхук для Telegram: автоматически ловит сообщения, добавление бота в группу
- * или переименование группы, извлекает первые цифры из названия (например "30211 Marketing Unit" -> "30211")
- * и сохраняет привязку projectId -> chatId в базу (Vercel KV / Upstash Redis).
+ * Вебхук для Telegram:
+ * 1) Автоматически привязывает чаты по первым цифрам в названии ("30211 Marketing Unit" -> "30211")
+ * 2) Ловит голоса в опросах (poll и poll_answer) и обновляет сводную статистику в админке
  */
 export async function POST(req: NextRequest) {
   try {
     const update = (await req.json()) as TelegramUpdate;
 
+    // 1. Обработка чата (новое сообщение или добавление бота)
     const chatObj =
       update.message?.chat ||
       update.my_chat_member?.chat ||
@@ -28,6 +34,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 2. Обработка обновления счетчиков опроса (poll)
+    if (update.poll) {
+      await updatePollStateFromTelegram(
+        update.poll.id,
+        update.poll.options.map((o) => ({ text: o.text, voterCount: o.voter_count })),
+        update.poll.total_voter_count
+      );
+    }
+
+    // 3. Обработка конкретного голоса участника в неанонимном опросе (poll_answer)
+    if (update.poll_answer && update.poll_answer.user) {
+      await updatePollAnswerFromTelegram(
+        update.poll_answer.poll_id,
+        update.poll_answer.user,
+        update.poll_answer.option_ids || []
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     console.error("Webhook error:", err);
@@ -41,4 +65,3 @@ export async function GET() {
     message: "Telegram Webhook endpoint is active",
   });
 }
-
