@@ -160,6 +160,15 @@ export async function POST(req: NextRequest) {
           );
         }
       }
+      // Если вебхук был временно отключен для чтения getUpdates — сразу восстанавливаем его обратно
+      if (body.restoreWebhookUrl) {
+        await fetch(
+          `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(
+            body.restoreWebhookUrl
+          )}&allowed_updates=${allowed}`
+        ).catch(() => {});
+      }
+
       await saveAllChats(chats);
       return NextResponse.json({ ok: true, chats, foundCount });
     }

@@ -186,30 +186,21 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // 1. Синхронизация голосов из Telegram getUpdates + объединение с клиентским стейтом
+    // 1. Синхронизация голосов из базы (а если не задан Webhook — также из Telegram getUpdates)
     if (action === "sync_votes") {
       const token = getBotToken(body.botToken);
       const clientPolls = (body.clientPolls || []) as PollCampaign[];
       const serverPolls = await getAllPolls();
       let combined = mergePollCampaignLists(serverPolls, clientPolls);
 
+      // Читаем getUpdates ТОЛЬКО если Webhook не установлен (никогда не удаляем активный Webhook!)
       const allowed = encodeURIComponent(
         JSON.stringify(["message", "my_chat_member", "channel_post", "poll", "poll_answer"])
       );
-      let res = await fetch(
+      const res = await fetch(
         `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
       );
-      let data = await res.json();
-
-      if (!data.ok && String(data.description || "").toLowerCase().includes("webhook")) {
-        await fetch(
-          `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`
-        );
-        res = await fetch(
-          `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
-        );
-        data = await res.json();
-      }
+      const data = await res.json();
 
       if (data.ok && Array.isArray(data.result)) {
         combined = applyUpdatesToPolls(combined, data.result as TelegramUpdate[]);

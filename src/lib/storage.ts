@@ -429,7 +429,7 @@ export async function updatePollAnswerFromTelegram(
             votedAt: new Date().toISOString(),
           };
         }
-        // Пересчитываем счетчики вариантов по голосам, если опрос неанонимный
+        // Пересчитываем счетчики вариантов строго по голосам
         const counts = inst.options.map(() => 0);
         for (const v of Object.values(inst.voters)) {
           for (const optIdx of v.optionIds) {
@@ -438,12 +438,9 @@ export async function updatePollAnswerFromTelegram(
         }
         inst.options = inst.options.map((opt, idx) => ({
           ...opt,
-          voterCount: Math.max(opt.voterCount, counts[idx] || 0),
+          voterCount: counts[idx] ?? 0,
         }));
-        inst.totalVoterCount = Math.max(
-          inst.totalVoterCount,
-          Object.keys(inst.voters).length
-        );
+        inst.totalVoterCount = Object.keys(inst.voters).length;
         inst.updatedAt = new Date().toISOString();
         changed = true;
       }

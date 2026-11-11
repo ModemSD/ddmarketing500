@@ -985,6 +985,7 @@ export default function AdminDashboard() {
         },
         body: JSON.stringify({
           action: "sync_updates",
+          restoreWebhookUrl: `${window.location.origin}/api/webhook`,
           botToken: customBotToken || undefined,
         }),
       });
