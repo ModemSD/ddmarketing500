@@ -70,20 +70,19 @@ function applyUpdatesToPolls(
               };
             }
 
-            const counts = inst.options.map(() => 0);
+            // 1) Считаем голоса по списку проголосовавших (voters)
+            const countsFromVoters = inst.options.map(() => 0);
             for (const v of Object.values(inst.voters)) {
               for (const optIdx of v.optionIds) {
-                if (counts[optIdx] !== undefined) counts[optIdx]++;
+                if (countsFromVoters[optIdx] !== undefined) countsFromVoters[optIdx]++;
               }
             }
+            // 2) Перезаписываем точным значением из inst.voters
             inst.options = inst.options.map((opt, idx) => ({
               ...opt,
-              voterCount: Math.max(opt.voterCount, counts[idx] || 0),
+              voterCount: countsFromVoters[idx] ?? 0,
             }));
-            inst.totalVoterCount = Math.max(
-              inst.totalVoterCount,
-              Object.keys(inst.voters).length
-            );
+            inst.totalVoterCount = Object.keys(inst.voters).length;
             inst.updatedAt = new Date().toISOString();
           }
         }
@@ -108,7 +107,8 @@ function mergePollCampaignLists(
       if (!existing) {
         map.set(p.id, p);
       } else {
-        // Объединяем данные голосов
+        // Объединяем данные голосов: если у одной из сторон есть проголосовавшие (voters),
+        // всегда пересчитываем счетчики строго из объединенного списка voters!
         const mergedChats: Record<string, PollChatInstance> = {
           ...existing.chats,
           ...p.chats,
@@ -117,16 +117,40 @@ function mergePollCampaignLists(
           const cChat = existing.chats?.[pid];
           const sChat = p.chats?.[pid];
           if (cChat && sChat) {
+            const cUpdated = cChat.updatedAt || "";
+            const sUpdated = sChat.updatedAt || "";
+            const newerChat = sUpdated >= cUpdated ? sChat : cChat;
+            const olderChat = sUpdated >= cUpdated ? cChat : sChat;
+
+            const mergedVoters: Record<string, typeof newerChat.voters[string]> = {
+              ...(olderChat.voters || {}),
+              ...(newerChat.voters || {}),
+            };
+
+            const voterCountByOpt = (newerChat.options || []).map((_, idx) => {
+              let cnt = 0;
+              for (const v of Object.values(mergedVoters)) {
+                if ((v.optionIds || []).includes(idx)) cnt++;
+              }
+              return cnt;
+            });
+            const hasVoters = Object.keys(mergedVoters).length > 0;
+
             mergedChats[pid] = {
-              ...sChat,
-              totalVoterCount: Math.max(cChat.totalVoterCount || 0, sChat.totalVoterCount || 0),
-              voters: { ...(cChat.voters || {}), ...(sChat.voters || {}) },
-              options: (sChat.options || []).map((opt, idx) => ({
+              ...newerChat,
+              voters: mergedVoters,
+              totalVoterCount: hasVoters
+                ? Object.keys(mergedVoters).length
+                : Math.max(cChat.totalVoterCount || 0, sChat.totalVoterCount || 0),
+              options: (newerChat.options || []).map((opt, idx) => ({
                 text: opt.text,
-                voterCount: Math.max(
-                  opt.voterCount || 0,
-                  cChat.options?.[idx]?.voterCount || 0
-                ),
+                voterCount: hasVoters
+                  ? voterCountByOpt[idx]
+                  : Math.max(
+                      opt.voterCount || 0,
+                      cChat.options?.[idx]?.voterCount || 0,
+                      sChat.options?.[idx]?.voterCount || 0
+                    ),
               })),
             };
           }

@@ -153,6 +153,63 @@ function getLocalPollsFilePath(): string {
 
 const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
   {
+    id: "poll_1794402829728",
+    folder: "123",
+    question: "123123",
+    options: ["Да, всё готово", "В процессе", "Нужна помощь"],
+    isAnonymous: false,
+    allowsMultipleAnswers: false,
+    createdAt: "2026-11-11T13:13:49.728Z",
+    chats: {
+      "25555": {
+        pollId: "5449755947444476082",
+        projectId: "25555",
+        chatId: "-5257696187",
+        chatTitle: "25555 Marketing Unit",
+        messageId: 22,
+        totalVoterCount: 1,
+        options: [
+          { text: "Да, всё готово", voterCount: 0 },
+          { text: "В процессе", voterCount: 1 },
+          { text: "Нужна помощь", voterCount: 0 },
+        ],
+        voters: {
+          "1145547373": {
+            userId: "1145547373",
+            name: "Dmitrii",
+            username: "envyzzz",
+            optionIds: [1],
+            votedAt: "2026-11-11T13:19:20.932Z",
+          },
+        },
+        updatedAt: "2026-11-11T13:19:20.932Z",
+      },
+      "26666": {
+        pollId: "5449675721750353643",
+        projectId: "26666",
+        chatId: "-5560094301",
+        chatTitle: "26666 Marketing Unit",
+        messageId: 23,
+        totalVoterCount: 1,
+        options: [
+          { text: "Да, всё готово", voterCount: 1 },
+          { text: "В процессе", voterCount: 0 },
+          { text: "Нужна помощь", voterCount: 0 },
+        ],
+        voters: {
+          "1145547373": {
+            userId: "1145547373",
+            name: "Dmitrii",
+            username: "envyzzz",
+            optionIds: [0],
+            votedAt: "2026-11-11T13:15:17.913Z",
+          },
+        },
+        updatedAt: "2026-11-11T13:15:17.913Z",
+      },
+    },
+  },
+  {
     id: "poll_1794402126814",
     folder: "Маркетинг",
     question: "а?",

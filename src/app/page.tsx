@@ -235,14 +235,20 @@ export default function AdminDashboard() {
     fetchPolls(savedPass, initialPollsBackup, savedToken);
   }, []);
 
-  // Авто-обновление голосов каждые 6 секунд, пока открыта вкладка "Опросы"
+  const pollsHistoryRef = useRef<PollCampaign[]>([]);
+  useEffect(() => {
+    pollsHistoryRef.current = pollsHistory;
+  }, [pollsHistory]);
+
+  // Авто-обновление голосов каждые 5 секунд, пока открыта вкладка "Опросы"
   useEffect(() => {
     if (activeTab !== "polls") return;
+    fetchPolls(adminPassword, pollsHistoryRef.current, customBotToken);
     const timer = setInterval(() => {
-      fetchPolls(adminPassword, pollsHistory, customBotToken);
-    }, 6000);
+      fetchPolls(adminPassword, pollsHistoryRef.current, customBotToken);
+    }, 5000);
     return () => clearInterval(timer);
-  }, [activeTab, adminPassword, pollsHistory, customBotToken]);
+  }, [activeTab, adminPassword, customBotToken]);
 
   // Сохраняем бэкап опросов в localStorage браузера
   useEffect(() => {
