@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  addIncomingFeedMessage,
   extractProjectIdFromTitle,
   getAllChats,
   normalizeChatIdString,
@@ -144,7 +145,40 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        if (u.poll) {
+        if (u.message && u.message.chat && !u.message.from?.is_bot) {
+          const msgText = (u.message.text || u.message.caption || "").trim();
+          if (msgText) {
+            const cleanChatId = normalizeChatIdString(u.message.chat.id);
+            const projId = extractProjectIdFromTitle(u.message.chat.title) || "Чат";
+            const senderName =
+              [u.message.from?.first_name, u.message.from?.last_name].filter(Boolean).join(" ") ||
+              "Участник";
+            const replyMsg = u.message.reply_to_message;
+            const replyToText =
+              replyMsg?.text ||
+              replyMsg?.caption ||
+              (replyMsg?.poll?.question ? `📊 Опрос: ${replyMsg.poll.question}` : undefined);
+
+            await addIncomingFeedMessage({
+              id: `${cleanChatId}_${u.message.message_id}`,
+              projectId: projId,
+              chatId: cleanChatId,
+              chatTitle: u.message.chat.title || `${projId} Marketing Unit`,
+              messageId: u.message.message_id,
+              userId: String(u.message.from?.id || "0"),
+              userName: senderName,
+              username: u.message.from?.username,
+              text: msgText,
+              replyToMessageId: replyMsg?.message_id,
+              replyToText,
+              createdAt: u.message.date
+                ? new Date(u.message.date * 1000).toISOString()
+                : new Date().toISOString(),
+            });
+          }
+        }
+
+        if (u.poll && u.poll.is_anonymous) {
           await updatePollStateFromTelegram(
             u.poll.id,
             u.poll.options.map((o) => ({ text: o.text, voterCount: o.voter_count })),

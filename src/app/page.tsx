@@ -26,6 +26,8 @@ import {
   Filter,
   Lock,
   LogOut,
+  MessageSquare,
+  CornerDownRight,
 } from "lucide-react";
 
 interface StartupChat {
@@ -107,6 +109,26 @@ interface PollCampaign {
   chats: Record<string, PollChatInstance>;
 }
 
+interface BotFeedMessage {
+  id: string;
+  projectId: string;
+  chatId: string;
+  chatTitle: string;
+  messageId: number;
+  userId: string;
+  userName: string;
+  username?: string;
+  text: string;
+  replyToMessageId?: number;
+  replyToText?: string;
+  createdAt: string;
+  adminReplies?: Array<{
+    messageId?: number;
+    text: string;
+    sentAt: string;
+  }>;
+}
+
 function normalizeDash(str: string): string {
   const digits = String(str).replace(/\D/g, "");
   if (!digits) return String(str).trim();
@@ -123,7 +145,9 @@ function columnLetterToIndex(letter: string): number {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"sheet" | "broadcast" | "polls" | "chats">("sheet");
+  const [activeTab, setActiveTab] = useState<"sheet" | "broadcast" | "polls" | "feed" | "chats">(
+    "sheet"
+  );
 
   // Авторизация и настройки
   const [adminPassword, setAdminPassword] = useState("");
@@ -196,6 +220,14 @@ export default function AdminDashboard() {
 
   // Модальное окно подтверждения отправки (вместо системного window.confirm)
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
+
+  // Вкладка: Ответы / Фид сообщений из чатов
+  const [feedMessages, setFeedMessages] = useState<BotFeedMessage[]>([]);
+  const [loadingFeed, setLoadingFeed] = useState(false);
+  const [feedProjectFilter, setFeedProjectFilter] = useState<string>("ALL");
+  const [feedOnlyRepliesFilter, setFeedOnlyRepliesFilter] = useState<boolean>(false);
+  const [feedReplyInputs, setFeedReplyInputs] = useState<Record<string, string>>({});
+  const [sendingFeedReplyId, setSendingFeedReplyId] = useState<string | null>(null);
 
   // Статус отправки и уведомления
   const [sending, setSending] = useState(false);
@@ -585,6 +617,7 @@ export default function AdminDashboard() {
       if (initialPollsBackup !== undefined) {
         fetchPolls(pass, initialPollsBackup, tokenOverride);
       }
+      fetchFeed(pass);
 
       return true;
     } catch (err: unknown) {
@@ -620,6 +653,147 @@ export default function AdminDashboard() {
     setLoginInput("");
     setAuthStatus("unauthenticated");
   }
+
+  // Авто-обновление ленты ответов (Фида) каждые 5 секунд, пока открыта вкладка "feed"
+  useEffect(() => {
+    if (activeTab !== "feed" || authStatus !== "authenticated") return;
+    fetchFeed(adminPassword);
+    const timer = setInterval(() => {
+      fetchFeed(adminPassword);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeTab, adminPassword, authStatus]);
+
+  async function fetchFeed(pass = adminPassword) {
+    setLoadingFeed(true);
+    try {
+      const res = await fetch("/api/feed", {
+        headers: { "x-admin-password": pass },
+      });
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.feed)) {
+        setFeedMessages(data.feed);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingFeed(false);
+    }
+  }
+
+  async function handleSendFeedReply(item: BotFeedMessage) {
+    const replyText = (feedReplyInputs[item.id] || "").trim();
+    if (!replyText) return;
+
+    setSendingFeedReplyId(item.id);
+    try {
+      const res = await fetch("/api/feed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "reply",
+          feedItemId: item.id,
+          chatId: item.chatId,
+          replyToMessageId: item.messageId,
+          text: replyText,
+          botToken: customBotToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatusMessage({
+          type: "error",
+          text: data.error || "Не удалось отправить ответ",
+        });
+        return;
+      }
+
+      if (Array.isArray(data.feed)) {
+        setFeedMessages(data.feed);
+      }
+      setFeedReplyInputs((prev) => ({ ...prev, [item.id]: "" }));
+      setStatusMessage({
+        type: "success",
+        text: `Ответ отправлен в чат «${item.chatTitle}»!`,
+      });
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Ошибка отправки ответа",
+      });
+    } finally {
+      setSendingFeedReplyId(null);
+    }
+  }
+
+  async function handleDeleteFeedItem(feedItemId: string) {
+    const res = await fetch("/api/feed", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({ action: "delete_item", feedItemId }),
+    });
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.feed)) {
+      setFeedMessages(data.feed);
+    }
+  }
+
+  async function handleDeleteAdminReplyFromFeed(
+    feedItemId: string,
+    chatId: string,
+    replyMessageId: number
+  ) {
+    setDeletingMessages(true);
+    try {
+      const res = await fetch("/api/feed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "delete_admin_reply",
+          feedItemId,
+          chatId,
+          replyMessageId,
+          botToken: customBotToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.feed)) {
+        setFeedMessages(data.feed);
+        setStatusMessage({
+          type: "success",
+          text: "Ваш ответ удалён из чата Telegram!",
+        });
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: data.error || "Ошибка удаления ответа",
+        });
+      }
+    } finally {
+      setDeletingMessages(false);
+    }
+  }
+
+  const filteredFeedMessages = useMemo(() => {
+    return feedMessages.filter((item) => {
+      if (feedProjectFilter !== "ALL" && item.projectId !== feedProjectFilter) {
+        return false;
+      }
+      if (feedOnlyRepliesFilter && !item.replyToText && !item.replyToMessageId) {
+        return false;
+      }
+      return true;
+    });
+  }, [feedMessages, feedProjectFilter, feedOnlyRepliesFilter]);
 
   // Загрузка и парсинг Google Таблицы
   async function handleLoadSheet(customHeaderRow?: number) {
@@ -1485,6 +1659,17 @@ export default function AdminDashboard() {
             >
               <BarChart3 className="w-4 h-4" />
               Опросы
+            </button>
+            <button
+              onClick={() => setActiveTab("feed")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition ${
+                activeTab === "feed"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Ответы / Фид ({feedMessages.length})
             </button>
             <button
               onClick={() => setActiveTab("chats")}
@@ -2745,6 +2930,218 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ВКЛАДКА: ОТВЕТЫ УЧАСТНИКОВ НА СООБЩЕНИЯ БОТА (ФИД) */}
+        {activeTab === "feed" && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-indigo-600" />
+                  Фид ответов от стартапов ({filteredFeedMessages.length} из {feedMessages.length})
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Сюда в реальном времени прилетают все ответы (Reply) участников на рассылки и опросы бота, а также упоминания бота в группах. Вы можете ответить им прямо отсюда в тот же тред.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchFeed()}
+                  disabled={loadingFeed}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm transition cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingFeed ? "animate-spin" : ""}`} />
+                  Обновить ленту
+                </button>
+              </div>
+            </div>
+
+            {/* Панель фильтров фида */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                    <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                    Проект:
+                  </span>
+                  <select
+                    value={feedProjectFilter}
+                    onChange={(e) => setFeedProjectFilter(e.target.value)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 bg-white"
+                  >
+                    <option value="ALL">Все стартапы ({Object.keys(chats).length})</option>
+                    {chatList.map((c) => (
+                      <option key={c.projectId} value={c.projectId}>
+                        #{c.projectId} — {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={feedOnlyRepliesFilter}
+                    onChange={(e) => setFeedOnlyRepliesFilter(e.target.checked)}
+                    className="rounded border-slate-300 text-indigo-600"
+                  />
+                  Только прямые ответы (Reply) на сообщения бота
+                </label>
+              </div>
+            </div>
+
+            {filteredFeedMessages.length === 0 ? (
+              <div className="p-10 text-center border border-dashed border-slate-200 rounded-xl space-y-1.5">
+                <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
+                <div className="text-sm font-semibold text-slate-600">
+                  В ленте пока нет сообщений
+                </div>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Как только кто-то в групповом чате ответит (Reply) на сообщение или опрос бота, сообщение мгновенно появится здесь.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredFeedMessages.map((item) => {
+                  const replyDraft = feedReplyInputs[item.id] || "";
+                  const isSendingThis = sendingFeedReplyId === item.id;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 hover:border-indigo-200 transition"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-xs font-bold">
+                            #{item.projectId}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900">
+                            {item.chatTitle}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            👤 {item.userName}
+                            {item.username ? (
+                              <span className="text-indigo-600 font-normal">
+                                {" "}
+                                (@{item.username})
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(item.createdAt).toLocaleString("ru-RU")}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFeedItem(item.id)}
+                          className="text-xs text-slate-400 hover:text-rose-600 flex items-center gap-1 cursor-pointer"
+                          title="Убрать карточку из ленты"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Скрыть
+                        </button>
+                      </div>
+
+                      {/* Цитата сообщения бота, на которое ответил участник */}
+                      {item.replyToText && (
+                        <div className="pl-3 border-l-2 border-indigo-400 bg-slate-50 rounded-r-lg py-1.5 px-2.5 text-xs text-slate-600">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 mb-0.5">
+                            В ответ на сообщение бота:
+                          </div>
+                          <div className="line-clamp-2 whitespace-pre-wrap">{item.replyToText}</div>
+                        </div>
+                      )}
+
+                      {/* Текст сообщения самого участника */}
+                      <div className="text-sm text-slate-900 whitespace-pre-wrap bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                        {item.text}
+                      </div>
+
+                      {/* Отправленные ответы администратора */}
+                      {item.adminReplies && item.adminReplies.length > 0 && (
+                        <div className="space-y-1.5 pl-4">
+                          {item.adminReplies.map((rep, rIdx) => (
+                            <div
+                              key={rIdx}
+                              className="flex items-start justify-between gap-2 bg-indigo-50/60 border border-indigo-100 rounded-xl p-2.5 text-xs"
+                            >
+                              <div className="flex items-start gap-2">
+                                <CornerDownRight className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-semibold text-indigo-900">
+                                    Ваш ответ от имени бота:
+                                  </span>{" "}
+                                  <span className="text-slate-800 whitespace-pre-wrap">
+                                    {rep.text}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 ml-2">
+                                    {new Date(rep.sentAt).toLocaleTimeString("ru-RU")}
+                                  </span>
+                                </div>
+                              </div>
+                              {rep.messageId && (
+                                <button
+                                  type="button"
+                                  disabled={deletingMessages}
+                                  onClick={() =>
+                                    handleDeleteAdminReplyFromFeed(
+                                      item.id,
+                                      item.chatId,
+                                      rep.messageId!
+                                    )
+                                  }
+                                  className="text-[11px] text-rose-600 hover:underline shrink-0 cursor-pointer"
+                                  title="Удалить этот ответ из чата Telegram"
+                                >
+                                  Удалить из ТГ
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Поле быстрого ответа в тред */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={replyDraft}
+                          onChange={(e) =>
+                            setFeedReplyInputs((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendFeedReply(item);
+                            }
+                          }}
+                          placeholder={`Ответить ${item.userName} в чат «${item.chatTitle}»...`}
+                          className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none bg-white"
+                        />
+                        <button
+                          type="button"
+                          disabled={isSendingThis || !replyDraft.trim()}
+                          onClick={() => handleSendFeedReply(item)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shrink-0 transition cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          {isSendingThis ? "Отправка..." : "Ответить"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

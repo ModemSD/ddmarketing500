@@ -29,14 +29,32 @@ export interface TelegramPollAnswerObj {
   option_ids: number[];
 }
 
+export interface TelegramUserObj {
+  id: number;
+  is_bot?: boolean;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: {
     message_id: number;
+    date?: number;
+    from?: TelegramUserObj;
     chat: TelegramChatObj;
     text?: string;
+    caption?: string;
     new_chat_title?: string;
     poll?: TelegramPollObj;
+    reply_to_message?: {
+      message_id: number;
+      from?: TelegramUserObj;
+      text?: string;
+      caption?: string;
+      poll?: { question?: string };
+    };
   };
   my_chat_member?: {
     chat: TelegramChatObj;
@@ -74,7 +92,8 @@ async function callSendMessage(
   token: string,
   chatId: string,
   text: string,
-  parseMode: "HTML" | "Markdown" | ""
+  parseMode: "HTML" | "Markdown" | "",
+  replyToMessageId?: number
 ): Promise<{ ok: boolean; description?: string; result?: { message_id?: number } }> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
@@ -83,6 +102,9 @@ async function callSendMessage(
   };
   if (parseMode) {
     body.parse_mode = parseMode;
+  }
+  if (replyToMessageId) {
+    body.reply_to_message_id = Number(replyToMessageId);
   }
 
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -98,16 +120,29 @@ export async function sendTelegramMessage(
   chatId: string | number,
   text: string,
   parseMode: "HTML" | "Markdown" | "" = "HTML",
-  overrideToken?: string
+  overrideToken?: string,
+  replyToMessageId?: number
 ): Promise<{ ok: boolean; messageId?: number; error?: string }> {
   try {
     const primaryToken = getBotToken(overrideToken);
     const cleanChatId = normalizeChatId(chatId);
 
-    const data = await callSendMessage(primaryToken, cleanChatId, text, parseMode);
+    const data = await callSendMessage(
+      primaryToken,
+      cleanChatId,
+      text,
+      parseMode,
+      replyToMessageId
+    );
 
     if (!data.ok && primaryToken !== FALLBACK_BOT_TOKEN) {
-      const retryData = await callSendMessage(FALLBACK_BOT_TOKEN, cleanChatId, text, parseMode);
+      const retryData = await callSendMessage(
+        FALLBACK_BOT_TOKEN,
+        cleanChatId,
+        text,
+        parseMode,
+        replyToMessageId
+      );
       if (retryData.ok) {
         return { ok: true, messageId: retryData.result?.message_id };
       }

@@ -45,8 +45,29 @@ export interface PollCampaign {
   chats: Record<string, PollChatInstance>; // projectId -> PollChatInstance
 }
 
+export interface BotFeedMessage {
+  id: string; // `${chatId}_${messageId}`
+  projectId: string;
+  chatId: string;
+  chatTitle: string;
+  messageId: number;
+  userId: string;
+  userName: string;
+  username?: string;
+  text: string;
+  replyToMessageId?: number;
+  replyToText?: string;
+  createdAt: string;
+  adminReplies?: Array<{
+    messageId?: number;
+    text: string;
+    sentAt: string;
+  }>;
+}
+
 const KV_KEY = "bot500:chats";
 const KV_POLLS_KEY = "bot500:polls";
+const KV_FEED_KEY = "bot500:feed";
 
 function getRedis(): Redis | null {
   const url =
@@ -450,4 +471,62 @@ export async function updatePollAnswerFromTelegram(
     await saveAllPolls(polls);
   }
 }
+
+function getLocalFeedFilePath(): string {
+  const isVercel = Boolean(process.env.VERCEL);
+  const dir = isVercel ? "/tmp" : path.join(process.cwd(), "data");
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return path.join(dir, "feed.json");
+}
+
+export async function getAllFeedMessages(): Promise<BotFeedMessage[]> {
+  const redis = getRedis();
+  if (redis) {
+    const data = await redis.get<BotFeedMessage[]>(KV_FEED_KEY);
+    return Array.isArray(data) ? data : [];
+  }
+
+  const filePath = getLocalFeedFilePath();
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(raw) as BotFeedMessage[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveAllFeedMessages(items: BotFeedMessage[]): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(KV_FEED_KEY, items);
+    return;
+  }
+
+  const filePath = getLocalFeedFilePath();
+  fs.writeFileSync(filePath, JSON.stringify(items, null, 2), "utf-8");
+}
+
+export async function addIncomingFeedMessage(item: BotFeedMessage): Promise<BotFeedMessage[]> {
+  const feed = await getAllFeedMessages();
+  const existingIdx = feed.findIndex((f) => f.id === item.id);
+  if (existingIdx !== -1) {
+    feed[existingIdx] = {
+      ...feed[existingIdx],
+      ...item,
+      adminReplies: feed[existingIdx].adminReplies || item.adminReplies,
+    };
+  } else {
+    feed.unshift(item);
+  }
+  const trimmed = feed.slice(0, 200); // храним последние 200 сообщений в ленте
+  await saveAllFeedMessages(trimmed);
+  return trimmed;
+}
+
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  addIncomingFeedMessage,
   extractProjectIdFromTitle,
+  normalizeChatIdString,
   upsertChat,
   updatePollAnswerFromTelegram,
   updatePollStateFromTelegram,
@@ -10,7 +12,8 @@ import { TelegramUpdate } from "@/lib/telegram";
 /**
  * Вебхук для Telegram:
  * 1) Автоматически привязывает чаты по первым цифрам в названии ("30211 Marketing Unit" -> "30211")
- * 2) Ловит голоса в опросах (poll и poll_answer) и обновляет сводную статистику в админке
+ * 2) Сохраняет ответы участников в ленту (Фид ответов на сообщения бота)
+ * 3) Ловит голоса в опросах (poll и poll_answer) и обновляет сводную статистику в админке
  */
 export async function POST(req: NextRequest) {
   try {
@@ -22,14 +25,52 @@ export async function POST(req: NextRequest) {
       update.my_chat_member?.chat ||
       update.channel_post?.chat;
 
+    let detectedProjectId: string | null = null;
     if (chatObj && chatObj.title) {
-      const projectId = extractProjectIdFromTitle(chatObj.title);
-      if (projectId) {
+      detectedProjectId = extractProjectIdFromTitle(chatObj.title);
+      if (detectedProjectId) {
         await upsertChat({
-          projectId,
+          projectId: detectedProjectId,
           chatId: String(chatObj.id),
           title: chatObj.title,
           updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    // 1.5. Сохранение входящего сообщения / ответа от участника в Фид
+    const msg = update.message;
+    if (msg && msg.chat && !msg.from?.is_bot) {
+      const msgText = (msg.text || msg.caption || "").trim();
+      if (msgText) {
+        const cleanChatId = normalizeChatIdString(msg.chat.id);
+        const projId =
+          detectedProjectId || extractProjectIdFromTitle(msg.chat.title) || "Чат";
+        const senderName =
+          [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(" ") ||
+          "Участник";
+
+        const replyMsg = msg.reply_to_message;
+        const replyToText =
+          replyMsg?.text ||
+          replyMsg?.caption ||
+          (replyMsg?.poll?.question ? `📊 Опрос: ${replyMsg.poll.question}` : undefined);
+
+        await addIncomingFeedMessage({
+          id: `${cleanChatId}_${msg.message_id}`,
+          projectId: projId,
+          chatId: cleanChatId,
+          chatTitle: msg.chat.title || `${projId} Marketing Unit`,
+          messageId: msg.message_id,
+          userId: String(msg.from?.id || "0"),
+          userName: senderName,
+          username: msg.from?.username,
+          text: msgText,
+          replyToMessageId: replyMsg?.message_id,
+          replyToText,
+          createdAt: msg.date
+            ? new Date(msg.date * 1000).toISOString()
+            : new Date().toISOString(),
         });
       }
     }
