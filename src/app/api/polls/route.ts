@@ -169,14 +169,21 @@ export async function POST(req: NextRequest) {
       const serverPolls = await getAllPolls();
       let combined = mergePollCampaignLists(serverPolls, clientPolls);
 
-      let res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+      const allowed = encodeURIComponent(
+        JSON.stringify(["message", "my_chat_member", "channel_post", "poll", "poll_answer"])
+      );
+      let res = await fetch(
+        `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
+      );
       let data = await res.json();
 
       if (!data.ok && String(data.description || "").toLowerCase().includes("webhook")) {
         await fetch(
           `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`
         );
-        res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+        res = await fetch(
+          `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
+        );
         data = await res.json();
       }
 

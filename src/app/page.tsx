@@ -264,6 +264,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.ok && Array.isArray(data.polls)) {
         setPollsHistory(data.polls);
+        localStorage.setItem("bot500_local_polls_backup", JSON.stringify(data.polls));
       }
     } catch {
       // ignore
@@ -321,7 +322,10 @@ export default function AdminDashboard() {
         return;
       }
 
-      if (data.polls) setPollsHistory(data.polls);
+      if (data.polls) {
+        setPollsHistory(data.polls);
+        localStorage.setItem("bot500_local_polls_backup", JSON.stringify(data.polls));
+      }
       setSendResults(data.results || []);
       setStatusMessage({
         type: data.failCount === 0 ? "success" : "info",

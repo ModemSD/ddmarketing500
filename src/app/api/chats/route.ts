@@ -95,7 +95,12 @@ export async function POST(req: NextRequest) {
     // 4. Синхронизация через getUpdates (автоматически отключает webhook перед getUpdates, если он мешает)
     if (action === "sync_updates") {
       const token = getBotToken(body.botToken);
-      let res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+      const allowed = encodeURIComponent(
+        JSON.stringify(["message", "my_chat_member", "channel_post", "poll", "poll_answer"])
+      );
+      let res = await fetch(
+        `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
+      );
       let data = await res.json();
 
       // Если активен Webhook, Telegram возвращает 409 Conflict — отключаем Webhook с сохранением очереди и читаем getUpdates
@@ -103,7 +108,9 @@ export async function POST(req: NextRequest) {
         await fetch(
           `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`
         );
-        res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`);
+        res = await fetch(
+          `https://api.telegram.org/bot${token}/getUpdates?limit=100&allowed_updates=${allowed}`
+        );
         data = await res.json();
       }
 
@@ -163,8 +170,11 @@ export async function POST(req: NextRequest) {
       if (!webhookUrl) {
         return NextResponse.json({ ok: false, error: "Не указан URL вебхука" }, { status: 400 });
       }
+      const allowed = encodeURIComponent(
+        JSON.stringify(["message", "my_chat_member", "channel_post", "poll", "poll_answer"])
+      );
       const res = await fetch(
-        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
+        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&allowed_updates=${allowed}`
       );
       const data = await res.json();
       if (!data.ok) {

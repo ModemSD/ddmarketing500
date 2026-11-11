@@ -153,6 +153,63 @@ function getLocalPollsFilePath(): string {
 
 const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
   {
+    id: "poll_1794402126814",
+    folder: "Маркетинг",
+    question: "а?",
+    options: ["12321", "1323", "1231233123"],
+    isAnonymous: false,
+    allowsMultipleAnswers: false,
+    createdAt: "2026-11-11T13:02:06.814Z",
+    chats: {
+      "25555": {
+        pollId: "5449755947444476077",
+        projectId: "25555",
+        chatId: "-5257696187",
+        chatTitle: "25555 Marketing Unit",
+        messageId: 20,
+        totalVoterCount: 1,
+        options: [
+          { text: "12321", voterCount: 0 },
+          { text: "1323", voterCount: 1 },
+          { text: "1231233123", voterCount: 0 },
+        ],
+        voters: {
+          "308047978": {
+            userId: "308047978",
+            name: "Dmitrii Manapov",
+            username: "dmanapoff",
+            optionIds: [1],
+            votedAt: "2026-11-11T13:02:30.000Z",
+          },
+        },
+        updatedAt: "2026-11-11T13:02:30.000Z",
+      },
+      "26666": {
+        pollId: "5449675721750353631",
+        projectId: "26666",
+        chatId: "-5560094301",
+        chatTitle: "26666 Marketing Unit",
+        messageId: 21,
+        totalVoterCount: 1,
+        options: [
+          { text: "12321", voterCount: 0 },
+          { text: "1323", voterCount: 1 },
+          { text: "1231233123", voterCount: 0 },
+        ],
+        voters: {
+          "308047978": {
+            userId: "308047978",
+            name: "Dmitrii Manapov",
+            username: "dmanapoff",
+            optionIds: [1],
+            votedAt: "2026-11-11T13:02:30.000Z",
+          },
+        },
+        updatedAt: "2026-11-11T13:02:30.000Z",
+      },
+    },
+  },
+  {
     id: "poll_initial_kak_dela",
     folder: "Неделя 1",
     question: "Как дела?",
