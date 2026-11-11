@@ -19,6 +19,7 @@ import {
   Square,
   Eye,
   Link2,
+  X,
 } from "lucide-react";
 
 interface StartupChat {
@@ -40,6 +41,19 @@ interface SendResultItem {
   title?: string;
   ok: boolean;
   error?: string;
+}
+
+interface QueuedMessage {
+  projectId: string;
+  chatId: string;
+  title?: string;
+  text: string;
+}
+
+interface ConfirmModalState {
+  title: string;
+  subtitle: string;
+  messages: QueuedMessage[];
 }
 
 function columnLetterToIndex(letter: string): number {
@@ -94,6 +108,9 @@ export default function AdminDashboard() {
   // Вкладка 2: Общая рассылка
   const [broadcastText, setBroadcastText] = useState("");
   const [parseMode, setParseMode] = useState<"HTML" | "Markdown" | "">("HTML");
+
+  // Модальное окно подтверждения отправки (вместо системного window.confirm)
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
 
   // Статус отправки и уведомления
   const [sending, setSending] = useState(false);
@@ -340,7 +357,6 @@ export default function AdminDashboard() {
     return items;
   }, [rawGrid, idColumnLetter, dataStartRowNumber, sheetTemplate, chats, customOverrides]);
 
-  // При смене столбца ID автоматически обновляем выбор всех ID из таблицы
   useEffect(() => {
     if (allSheetItems.length > 0 && sheetSelectedIds.size === 0) {
       setSheetSelectedIds(new Set(allSheetItems.map((i) => i.projectId)));
@@ -359,7 +375,7 @@ export default function AdminDashboard() {
     );
   }, [allSheetItems, sheetPreviewSearch]);
 
-  // Итоговый список стартапов к отправке из таблицы (с учетом режима "Всем" или "Выбранным")
+  // Итоговый список стартапов к отправке из таблицы
   const targetSheetItemsToSend = useMemo(() => {
     return allSheetItems.filter((item) => {
       if (!item.chat?.chatId || !item.text.trim()) return false;
@@ -389,8 +405,8 @@ export default function AdminDashboard() {
     setSheetSelectedIds(new Set());
   }
 
-  // Отправка сообщений по таблице (всем или выбранным)
-  async function handleSendSheetMessages() {
+  // Открытие красивого модального окна перед отправкой по таблице
+  function handleSendSheetMessages() {
     if (targetSheetItemsToSend.length === 0) {
       setStatusMessage({
         type: "error",
@@ -399,26 +415,20 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (
-      !window.confirm(
-        `Отправить индивидуальные сообщения в ${targetSheetItemsToSend.length} чатов стартапов?`
-      )
-    ) {
-      return;
-    }
-
-    await executeSendQueue(
-      targetSheetItemsToSend.map((item) => ({
+    setConfirmModal({
+      title: "Подтверждение рассылки по таблице",
+      subtitle: `Будет отправлено индивидуальных сообщений: ${targetSheetItemsToSend.length} шт.`,
+      messages: targetSheetItemsToSend.map((item) => ({
         projectId: item.projectId,
         chatId: item.chat!.chatId,
         title: item.chat!.title,
         text: item.text,
-      }))
-    );
+      })),
+    });
   }
 
-  // Отправка только одному конкретному стартапу прямо из карточки предпросмотра
-  async function handleSendSingleSheetItem(item: {
+  // Открытие модального окна для отправки одному стартапу
+  function handleSendSingleSheetItem(item: {
     projectId: string;
     chat?: StartupChat;
     text: string;
@@ -434,22 +444,23 @@ export default function AdminDashboard() {
       setStatusMessage({ type: "error", text: "Текст сообщения пуст" });
       return;
     }
-    if (!window.confirm(`Отправить сообщение только в чат «${item.chat.title}»?`)) {
-      return;
-    }
 
-    await executeSendQueue([
-      {
-        projectId: item.projectId,
-        chatId: item.chat.chatId,
-        title: item.chat.title,
-        text: item.text,
-      },
-    ]);
+    setConfirmModal({
+      title: `Отправить сообщение в «${item.chat.title}»?`,
+      subtitle: `Проект #${item.projectId} (${item.chat.chatId})`,
+      messages: [
+        {
+          projectId: item.projectId,
+          chatId: item.chat.chatId,
+          title: item.chat.title,
+          text: item.text,
+        },
+      ],
+    });
   }
 
-  // Отправка общей/выборочной рассылки
-  async function handleSendBroadcast() {
+  // Открытие модального окна для общей рассылки
+  function handleSendBroadcast() {
     if (!broadcastText.trim()) {
       setStatusMessage({ type: "error", text: "Введите текст сообщения для рассылки" });
       return;
@@ -461,29 +472,22 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (
-      !window.confirm(
-        `Отправить сообщение в выбранные чаты (${targets.length} шт.)?`
-      )
-    ) {
-      return;
-    }
-
-    await executeSendQueue(
-      targets.map((chat) => ({
+    setConfirmModal({
+      title: "Отправить общее сообщение?",
+      subtitle: `Получателей: ${targets.length} ${targets.length === 1 ? "чат" : "чатов"}`,
+      messages: targets.map((chat) => ({
         projectId: chat.projectId,
         chatId: chat.chatId,
         title: chat.title,
         text: broadcastText
           .replace(/\{ID\}/gi, chat.projectId)
           .replace(/\{TITLE\}/gi, chat.title),
-      }))
-    );
+      })),
+    });
   }
 
-  async function executeSendQueue(
-    messages: Array<{ projectId: string; chatId: string; title?: string; text: string }>
-  ) {
+  async function executeSendQueue(messages: QueuedMessage[]) {
+    setConfirmModal(null);
     setSending(true);
     setSendResults(null);
     setStatusMessage({
@@ -1660,6 +1664,93 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {/* Красивое встроенное модальное окно подтверждения отправки */}
+      {confirmModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
+          onClick={() => setConfirmModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Шапка модалки */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {confirmModal.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {confirmModal.subtitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Список получателей и предпросмотр */}
+            <div className="p-5 space-y-3 max-h-80 overflow-y-auto bg-slate-50/60">
+              <div className="text-xs font-medium text-slate-500">
+                Предпросмотр отправки ({confirmModal.messages.length}):
+              </div>
+              <div className="space-y-2">
+                {confirmModal.messages.slice(0, 15).map((m, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-white border border-slate-200 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-700">
+                        #{m.projectId} — {m.title || "Чат стартапа"}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        {m.chatId}
+                      </span>
+                    </div>
+                    <p className="text-slate-700 whitespace-pre-wrap line-clamp-3 font-sans">
+                      {m.text}
+                    </p>
+                  </div>
+                ))}
+                {confirmModal.messages.length > 15 && (
+                  <div className="text-center text-xs text-slate-500 py-1">
+                    ...и ещё {confirmModal.messages.length - 15} чатов
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Кнопки действий */}
+            <div className="px-5 py-3.5 bg-white border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => executeSendQueue(confirmModal.messages)}
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Подтвердить и отправить ({confirmModal.messages.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
