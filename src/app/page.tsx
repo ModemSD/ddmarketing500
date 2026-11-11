@@ -43,8 +43,17 @@ interface SendResultItem {
   projectId: string;
   chatId: string;
   title?: string;
+  text?: string;
+  messageId?: number;
+  deleted?: boolean;
   ok: boolean;
   error?: string;
+}
+
+interface SentBatchHistory {
+  id: string;
+  createdAt: string;
+  items: SendResultItem[];
 }
 
 interface QueuedMessage {
@@ -186,6 +195,8 @@ export default function AdminDashboard() {
     text: string;
   } | null>(null);
   const [sendResults, setSendResults] = useState<SendResultItem[] | null>(null);
+  const [sentHistory, setSentHistory] = useState<SentBatchHistory[]>([]);
+  const [deletingMessages, setDeletingMessages] = useState(false);
 
   // Загрузка сохраненных настроек из localStorage + запрос чатов с сервера
   useEffect(() => {
@@ -196,11 +207,19 @@ export default function AdminDashboard() {
     const savedLocalChats = localStorage.getItem("bot500_local_chats_backup");
     const savedLocalPolls = localStorage.getItem("bot500_local_polls_backup");
     const savedCustomFolders = localStorage.getItem("bot500_poll_folders");
+    const savedSentHistory = localStorage.getItem("bot500_sent_history");
 
     if (savedPass) setAdminPassword(savedPass);
     if (savedToken) setCustomBotToken(savedToken);
     if (savedSheetUrl) setSheetUrl(savedSheetUrl);
     if (savedTemplate) setSheetTemplate(savedTemplate);
+    if (savedSentHistory) {
+      try {
+        setSentHistory(JSON.parse(savedSentHistory));
+      } catch {
+        // ignore
+      }
+    }
     if (savedCustomFolders) {
       try {
         const parsedFolders = JSON.parse(savedCustomFolders);
@@ -356,7 +375,10 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleDeletePollCampaign(pollCampaignId: string) {
+  async function handleDeletePollCampaign(
+    pollCampaignId: string,
+    deleteFromTelegram = false
+  ) {
     const nextLocal = pollsHistory.filter((p) => p.id !== pollCampaignId);
     setPollsHistory(nextLocal);
     localStorage.setItem("bot500_local_polls_backup", JSON.stringify(nextLocal));
@@ -370,12 +392,20 @@ export default function AdminDashboard() {
       body: JSON.stringify({
         action: "delete",
         pollCampaignId,
+        deleteFromTelegram,
+        botToken: customBotToken || undefined,
         clientPolls: nextLocal,
       }),
     });
     const data = await res.json();
     if (data.ok) {
       setPollsHistory(data.polls || []);
+      if (deleteFromTelegram) {
+        setStatusMessage({
+          type: "success",
+          text: "Опрос удалён из чатов Telegram и из истории!",
+        });
+      }
     }
   }
 
@@ -909,7 +939,24 @@ export default function AdminDashboard() {
         return;
       }
 
-      setSendResults(data.results || []);
+      const resultsList: SendResultItem[] = data.results || [];
+      setSendResults(resultsList);
+
+      // Сохраняем отправленные сообщения с messageId в историю для возможности удаления в любой момент
+      const withMsgIds = resultsList.filter((r) => r.ok && r.messageId);
+      if (withMsgIds.length > 0) {
+        const newBatch: SentBatchHistory = {
+          id: `batch_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          items: resultsList,
+        };
+        setSentHistory((prev) => {
+          const next = [newBatch, ...prev].slice(0, 15);
+          localStorage.setItem("bot500_sent_history", JSON.stringify(next));
+          return next;
+        });
+      }
+
       setStatusMessage({
         type: data.failCount === 0 ? "success" : "info",
         text: `Рассылка завершена! Успешно: ${data.successCount}, Ошибок: ${data.failCount}`,
@@ -921,6 +968,84 @@ export default function AdminDashboard() {
       });
     } finally {
       setSending(false);
+    }
+  }
+
+  // Удаление (отзыв) отправленных сообщений из Telegram
+  async function handleRecallMessages(
+    itemsToRecall: Array<{ projectId: string; chatId: string; messageId: number }>,
+    batchId?: string
+  ) {
+    if (itemsToRecall.length === 0) return;
+    setDeletingMessages(true);
+    try {
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action: "delete_messages",
+          items: itemsToRecall,
+          botToken: customBotToken || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatusMessage({
+          type: "error",
+          text: data.error || "Ошибка удаления сообщений",
+        });
+        return;
+      }
+
+      const deletedSet = new Set(
+        (data.results || [])
+          .filter((r: { ok: boolean }) => r.ok)
+          .map((r: { projectId: string; messageId: number }) => `${r.projectId}_${r.messageId}`)
+      );
+
+      if (sendResults) {
+        setSendResults((prev) =>
+          prev
+            ? prev.map((item) =>
+                item.messageId && deletedSet.has(`${item.projectId}_${item.messageId}`)
+                  ? { ...item, deleted: true }
+                  : item
+              )
+            : null
+        );
+      }
+
+      setSentHistory((prev) => {
+        const next = prev
+          .map((batch) => {
+            if (batchId && batch.id !== batchId) return batch;
+            return {
+              ...batch,
+              items: batch.items.map((item) =>
+                item.messageId && deletedSet.has(`${item.projectId}_${item.messageId}`)
+                  ? { ...item, deleted: true }
+                  : item
+              ),
+            };
+          });
+        localStorage.setItem("bot500_sent_history", JSON.stringify(next));
+        return next;
+      });
+
+      setStatusMessage({
+        type: "success",
+        text: `Удалено сообщений из чатов Telegram: ${data.deletedCount} из ${itemsToRecall.length}`,
+      });
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Ошибка сети при удалении",
+      });
+    } finally {
+      setDeletingMessages(false);
     }
   }
 
@@ -2273,14 +2398,26 @@ export default function AdminDashboard() {
                               </b>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePollCampaign(campaign.id)}
-                            className="text-xs text-rose-500 hover:text-rose-700 flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Удалить из истории
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              disabled={deletingMessages}
+                              onClick={() => handleDeletePollCampaign(campaign.id, true)}
+                              className="text-xs text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg font-medium flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                              title="Удалить этот опрос во всех чатах Telegram и из истории"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Отозвать из Telegram
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePollCampaign(campaign.id, false)}
+                              className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
+                              title="Убрать только из истории админ-панели (в чатах опрос останется)"
+                            >
+                              Скрыть из истории
+                            </button>
+                          </div>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -2291,6 +2428,7 @@ export default function AdminDashboard() {
                                 <th className="py-2.5 px-3">Статус</th>
                                 <th className="py-2.5 px-3">Голоса по вариантам</th>
                                 <th className="py-2.5 px-3">Кто проголосовал</th>
+                                <th className="py-2.5 px-3 text-right">В чате ТГ</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -2351,6 +2489,30 @@ export default function AdminDashboard() {
                                         </div>
                                       ) : (
                                         <span className="text-slate-400 text-[11px]">—</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      {inst.messageId ? (
+                                        <button
+                                          type="button"
+                                          disabled={deletingMessages}
+                                          onClick={() =>
+                                            handleRecallMessages([
+                                              {
+                                                projectId: inst.projectId,
+                                                chatId: inst.chatId,
+                                                messageId: inst.messageId!,
+                                              },
+                                            ])
+                                          }
+                                          className="text-[11px] text-rose-600 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                          title="Удалить опрос только из этого чата Telegram"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                          Удалить из чата
+                                        </button>
+                                      ) : (
+                                        <span className="text-slate-300 text-[11px]">—</span>
                                       )}
                                     </td>
                                   </tr>
@@ -2578,34 +2740,202 @@ export default function AdminDashboard() {
         {/* Отчет о результатах последней рассылки */}
         {sendResults && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-slate-900">
                 Детальный отчёт по последней отправке ({sendResults.length})
               </h3>
-              <button
-                onClick={() => setSendResults(null)}
-                className="text-xs text-slate-500 hover:text-slate-800"
-              >
-                Скрыть отчёт
-              </button>
+              <div className="flex items-center gap-3">
+                {sendResults.some((r) => r.ok && r.messageId && !r.deleted) && (
+                  <button
+                    type="button"
+                    disabled={deletingMessages}
+                    onClick={() =>
+                      handleRecallMessages(
+                        sendResults
+                          .filter((r) => r.ok && r.messageId && !r.deleted)
+                          .map((r) => ({
+                            projectId: r.projectId,
+                            chatId: r.chatId,
+                            messageId: r.messageId!,
+                          }))
+                      )
+                    }
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {deletingMessages
+                      ? "Удаляем из чатов..."
+                      : "Удалить всю рассылку из Telegram"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setSendResults(null)}
+                  className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  Скрыть отчёт
+                </button>
+              </div>
             </div>
             <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 text-xs">
               {sendResults.map((r, idx) => (
-                <div key={idx} className="py-2 flex items-center justify-between">
+                <div key={idx} className="py-2 flex items-center justify-between gap-3">
                   <div>
                     <span className="font-bold text-slate-800">#{r.projectId}</span>{" "}
                     <span className="text-slate-600">{r.title}</span>{" "}
                     <span className="text-slate-400 font-mono">({r.chatId})</span>
                   </div>
-                  <div>
-                    {r.ok ? (
-                      <span className="text-emerald-600 font-medium">✓ Отправлено</span>
+                  <div className="flex items-center gap-3">
+                    {r.deleted ? (
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
+                        🗑 Удалено из чата ТГ
+                      </span>
+                    ) : r.ok ? (
+                      <>
+                        <span className="text-emerald-600 font-medium">✓ Отправлено</span>
+                        {r.messageId && (
+                          <button
+                            type="button"
+                            disabled={deletingMessages}
+                            onClick={() =>
+                              handleRecallMessages([
+                                {
+                                  projectId: r.projectId,
+                                  chatId: r.chatId,
+                                  messageId: r.messageId!,
+                                },
+                              ])
+                            }
+                            className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-50"
+                            title="Удалить это сообщение из чата в Telegram"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Удалить из ТГ
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <span className="text-rose-600 font-medium">✕ {r.error}</span>
                     )}
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* История отправленных сообщений (возможность отозвать/удалить в любой момент) */}
+        {(activeTab === "sheet" || activeTab === "broadcast") && sentHistory.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  История отправленных рассылок ({sentHistory.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Если вы отправили сообщение не туда или с опечаткой, нажмите «Удалить из ТГ» — бот мгновенно удалит его из группового чата.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSentHistory([]);
+                  localStorage.removeItem("bot500_sent_history");
+                }}
+                className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                Очистить историю
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {sentHistory.map((batch) => {
+                const activeItems = batch.items.filter(
+                  (i) => i.ok && i.messageId && !i.deleted
+                );
+                return (
+                  <div
+                    key={batch.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
+                      <span className="text-xs font-semibold text-slate-700">
+                        🕒 Отправлено: {new Date(batch.createdAt).toLocaleString("ru-RU")} • Чатов:{" "}
+                        {batch.items.length}
+                      </span>
+                      {activeItems.length > 0 ? (
+                        <button
+                          type="button"
+                          disabled={deletingMessages}
+                          onClick={() =>
+                            handleRecallMessages(
+                              activeItems.map((r) => ({
+                                projectId: r.projectId,
+                                chatId: r.chatId,
+                                messageId: r.messageId!,
+                              })),
+                              batch.id
+                            )
+                          }
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Отозвать всю рассылку ({activeItems.length})
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Все сообщения этой рассылки удалены из ТГ
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="divide-y divide-slate-100 text-xs">
+                      {batch.items.map((r, iIdx) => (
+                        <div
+                          key={iIdx}
+                          className="py-1.5 flex items-center justify-between gap-2"
+                        >
+                          <div>
+                            <span className="font-bold text-indigo-700">#{r.projectId}</span>{" "}
+                            <span className="text-slate-700 font-medium">{r.title}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {r.deleted ? (
+                              <span className="text-[11px] text-slate-400">
+                                🗑 Удалено из чата
+                              </span>
+                            ) : r.ok && r.messageId ? (
+                              <button
+                                type="button"
+                                disabled={deletingMessages}
+                                onClick={() =>
+                                  handleRecallMessages(
+                                    [
+                                      {
+                                        projectId: r.projectId,
+                                        chatId: r.chatId,
+                                        messageId: r.messageId!,
+                                      },
+                                    ],
+                                    batch.id
+                                  )
+                                }
+                                className="flex items-center gap-1 px-2 py-0.5 rounded bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Удалить из ТГ
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-rose-500">
+                                Ошибка: {r.error}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

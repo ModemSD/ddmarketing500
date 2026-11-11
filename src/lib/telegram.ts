@@ -75,7 +75,7 @@ async function callSendMessage(
   chatId: string,
   text: string,
   parseMode: "HTML" | "Markdown" | ""
-): Promise<{ ok: boolean; description?: string }> {
+): Promise<{ ok: boolean; description?: string; result?: { message_id?: number } }> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
     text,
@@ -99,30 +99,67 @@ export async function sendTelegramMessage(
   text: string,
   parseMode: "HTML" | "Markdown" | "" = "HTML",
   overrideToken?: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; messageId?: number; error?: string }> {
   try {
     const primaryToken = getBotToken(overrideToken);
     const cleanChatId = normalizeChatId(chatId);
 
-    let data = await callSendMessage(primaryToken, cleanChatId, text, parseMode);
+    const data = await callSendMessage(primaryToken, cleanChatId, text, parseMode);
 
-    // Если в настройках браузера/Vercel был указан старый/другой бот, у которого нет этого чата,
-    // пробуем отправить через основной токен @ddmarketing500_bot
     if (!data.ok && primaryToken !== FALLBACK_BOT_TOKEN) {
       const retryData = await callSendMessage(FALLBACK_BOT_TOKEN, cleanChatId, text, parseMode);
       if (retryData.ok) {
-        return { ok: true };
+        return { ok: true, messageId: retryData.result?.message_id };
       }
     }
 
     if (!data.ok) {
       return { ok: false, error: data.description || "Ошибка Telegram API" };
     }
-    return { ok: true };
+    return { ok: true, messageId: data.result?.message_id };
   } catch (err: unknown) {
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Неизвестная ошибка при отправке",
+    };
+  }
+}
+
+export async function deleteTelegramMessage(
+  chatId: string | number,
+  messageId: number,
+  overrideToken?: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const primaryToken = getBotToken(overrideToken);
+    const cleanChatId = normalizeChatId(chatId);
+
+    const callDelete = async (token: string) => {
+      const res = await fetch(`https://api.telegram.org/bot${token}/deleteMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: cleanChatId,
+          message_id: Number(messageId),
+        }),
+      });
+      return await res.json();
+    };
+
+    let data = await callDelete(primaryToken);
+    if (!data.ok && primaryToken !== FALLBACK_BOT_TOKEN) {
+      const retry = await callDelete(FALLBACK_BOT_TOKEN);
+      if (retry.ok) data = retry;
+    }
+
+    if (!data.ok) {
+      return { ok: false, error: data.description || "Не удалось удалить сообщение в Telegram" };
+    }
+    return { ok: true };
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Ошибка при удалении сообщения",
     };
   }
 }

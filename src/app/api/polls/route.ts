@@ -6,7 +6,13 @@ import {
   PollChatInstance,
   saveAllPolls,
 } from "@/lib/storage";
-import { getBotToken, sendTelegramPoll, sleep, TelegramUpdate } from "@/lib/telegram";
+import {
+  deleteTelegramMessage,
+  getBotToken,
+  sendTelegramPoll,
+  sleep,
+  TelegramUpdate,
+} from "@/lib/telegram";
 
 function checkAuth(req: NextRequest): boolean {
   const adminPassword = process.env.ADMIN_PASSWORD;
@@ -238,11 +244,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, polls: combined });
     }
 
-    // 3. Удаление опроса из истории
+    // 3. Удаление опроса из истории (и опционально отзыв самого опроса из чатов в Telegram!)
     if (action === "delete") {
-      const { pollCampaignId, clientPolls = [] } = body;
+      const {
+        pollCampaignId,
+        deleteFromTelegram = false,
+        botToken,
+        clientPolls = [],
+      } = body;
       const serverPolls = await getAllPolls();
       const combined = mergePollCampaignLists(serverPolls, clientPolls);
+      const targetCampaign = combined.find((p) => p.id === pollCampaignId);
+
+      if (deleteFromTelegram && targetCampaign?.chats) {
+        const chatEntries = Object.values(targetCampaign.chats);
+        for (const inst of chatEntries) {
+          if (inst.chatId && inst.messageId) {
+            await deleteTelegramMessage(inst.chatId, inst.messageId, botToken).catch(
+              () => {}
+            );
+            await sleep(40);
+          }
+        }
+      }
+
       const filtered = combined.filter((p) => p.id !== pollCampaignId);
       await saveAllPolls(filtered);
       return NextResponse.json({ ok: true, polls: filtered });
