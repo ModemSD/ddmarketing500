@@ -2307,6 +2307,19 @@ export default function AdminDashboard() {
                             }
                             className="w-full p-2.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-800 focus:border-indigo-500 focus:outline-none"
                           />
+
+                          {/* Если в тексте есть HTML-ссылки <a href="...">, показываем наглядный превью как в Telegram */}
+                          {/<a\s+href=/i.test(item.text) && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-white/90 border border-indigo-100 text-xs text-slate-800 space-y-1">
+                              <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500">
+                                Предпросмотр ссылок в Telegram:
+                              </div>
+                              <div
+                                className="whitespace-pre-wrap leading-relaxed [&_a]:text-blue-600 [&_a]:underline [&_a]:font-medium hover:[&_a]:text-blue-800"
+                                dangerouslySetInnerHTML={{ __html: item.text }}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
