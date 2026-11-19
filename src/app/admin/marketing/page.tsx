@@ -6,6 +6,7 @@ import { AppNav } from '@/components/AppNav';
 import { RefreshCw, Download, ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 
 interface MarketingRow {
   startup_id: string;
@@ -283,6 +284,7 @@ export default function MarketingPage() {
                 <tr>
                   <th className="w-8 px-2 py-3"></th>
                   <th className="px-4 py-3">Проект</th>
+                  <th className="px-3 py-3">Форм-фактор</th>
                   <th className="px-3 py-3 text-right">Расход (₽)</th>
                   <th className="px-3 py-3 text-right">Показы</th>
                   <th className="px-3 py-3 text-right">Клики</th>
@@ -297,7 +299,7 @@ export default function MarketingPage() {
               <tbody className="divide-y divide-slate-200 font-mono">
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
                       Загрузка...
                     </td>
                   </tr>
@@ -323,6 +325,9 @@ export default function MarketingPage() {
                             <span className="font-semibold text-slate-900">{r.name}</span>
                             <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
                           </td>
+                          <td className="px-3 py-2.5 font-sans text-[11px] text-slate-600">
+                            {(STARTUP_TAXONOMY[r.id]?.formats || []).join(', ') || '—'}
+                          </td>
                           <td className="px-3 py-2.5 text-right font-semibold">
                             {r.spend.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                           </td>
@@ -337,7 +342,7 @@ export default function MarketingPage() {
                         </tr>
                         {isOpen && (
                           <tr className="bg-slate-50/70">
-                            <td colSpan={11} className="px-8 py-3">
+                            <td colSpan={12} className="px-8 py-3">
                               {r.rows.length === 0 ? (
                                 <div className="py-2 text-xs text-slate-500">
                                   Нет данных за выбранный период.
