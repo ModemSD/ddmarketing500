@@ -771,6 +771,7 @@ export function MarketingProductOverview() {
           <thead>
             <tr className="border-b border-slate-200 text-slate-500">
               <th className="py-2">Проект</th>
+              <th className="py-2">Форм-фактор</th>
               <th onClick={() => handleSort('spend')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Расход (₽) {sortBy === 'spend' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
@@ -823,6 +824,9 @@ export function MarketingProductOverview() {
                     )}
                   </div>
                 </td>
+                <td className="py-2 text-slate-600">
+                  {(STARTUP_TAXONOMY[r.id]?.multiFormats || []).join(', ') || '—'}
+                </td>
                 <td className="py-2 text-right font-semibold">{Math.round(r.spend).toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.newUsers.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.totalUsers.toLocaleString('ru-RU')}</td>
@@ -838,6 +842,7 @@ export function MarketingProductOverview() {
           <tfoot>
             <tr className="border-t-2 border-slate-200 bg-slate-50 font-mono font-semibold text-slate-900">
               <td className="py-2.5 font-sans">Итого / Среднее ({sortedUnit.length})</td>
+              <td className="py-2.5" />
               <td className="py-2.5 text-right">{Math.round(totalSpend).toLocaleString('ru-RU')}</td>
               <td className="py-2.5 text-right">{totalNewUsers.toLocaleString('ru-RU')}</td>
               <td className="py-2.5 text-right">{sortedUnit.reduce((a, r) => a + r.totalUsers, 0).toLocaleString('ru-RU')}</td>
