@@ -177,6 +177,7 @@ export function MarketingProductOverview() {
       installs,
       cpi: installs > 0 ? Math.round(spend / installs) : 0,
       sumDau,
+      avgDau: pDays.length > 0 ? Math.round(sumDau / pDays.length) : 0,
       depth: sumDau > 0 ? Number((sumTc / sumDau).toFixed(1)) : 0,
       costPerDau: sumDau > 0 ? Math.round(spend / sumDau) : 0,
       growthPct,
@@ -196,7 +197,7 @@ export function MarketingProductOverview() {
         spend: a.spend - b.spend,
         cac: a.cac - b.cac,
         new_users: a.newUsers - b.newUsers,
-        dau: a.sumDau - b.sumDau,
+        dau: a.avgDau - b.avgDau,
         depth: a.depth - b.depth,
         cost_dau: a.costPerDau - b.costPerDau,
       };
@@ -660,7 +661,7 @@ export function MarketingProductOverview() {
                   <th className="py-2 text-right">Расход (₽)</th>
                   <th className="py-2 text-right">New Users</th>
                   <th className="py-2 text-right">Ср. CAC (₽)</th>
-                  <th className="py-2 text-right">Сумма DAU</th>
+                  <th className="py-2 text-right">Ср. DAU</th>
                   <th className="py-2 text-right">Ср. Глубина ИИ</th>
                 </tr>
               </thead>
@@ -697,8 +698,8 @@ export function MarketingProductOverview() {
                                   <th className="py-1 text-right">Расход (₽)</th>
                                   <th className="py-1 text-right">New Users</th>
                                   <th className="py-1 text-right">CAC (₽)</th>
-                                  <th className="py-1 text-right">Сумма DAU</th>
-                                  <th className="py-1 text-right">Глубина ИИ</th>
+                                  <th className="py-1 text-right">Ср. DAU</th>
+                                  <th className="py-1 text-right">Ср. глубина ИИ</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-200/60 font-mono">
@@ -715,7 +716,7 @@ export function MarketingProductOverview() {
                                     <td className="py-1 text-right">{Math.round(item.spend).toLocaleString('ru-RU')}</td>
                                     <td className="py-1 text-right">{item.newUsers.toLocaleString('ru-RU')}</td>
                                     <td className="py-1 text-right text-indigo-600">{item.cac > 0 ? item.cac : '—'}</td>
-                                    <td className="py-1 text-right">{item.sumDau.toLocaleString('ru-RU')}</td>
+                                    <td className="py-1 text-right">{item.avgDau.toLocaleString('ru-RU')}</td>
                                     <td className="py-1 text-right">{item.depth}</td>
                                   </tr>
                                 ))}
@@ -754,10 +755,10 @@ export function MarketingProductOverview() {
               </th>
               <th className="py-2 text-right">CPI (₽)</th>
               <th onClick={() => handleSort('dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
-                Сумма DAU {sortBy === 'dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                Ср. DAU {sortBy === 'dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
               <th onClick={() => handleSort('depth')} className="cursor-pointer py-2 text-right hover:text-slate-900">
-                Глубина ИИ {sortBy === 'depth' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                Ср. глубина ИИ {sortBy === 'depth' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
               <th onClick={() => handleSort('cost_dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Цена 1 DAU {sortBy === 'cost_dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
@@ -779,7 +780,7 @@ export function MarketingProductOverview() {
                 <td className="py-2 text-right">{r.newUsers.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right font-semibold text-indigo-600">{r.cac > 0 ? r.cac : '—'}</td>
                 <td className="py-2 text-right">{r.cpi > 0 ? r.cpi : '—'}</td>
-                <td className="py-2 text-right">{r.sumDau.toLocaleString('ru-RU')}</td>
+                <td className="py-2 text-right">{r.avgDau.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.depth}</td>
                 <td className="py-2 text-right">{r.costPerDau > 0 ? r.costPerDau : '—'}</td>
               </tr>
