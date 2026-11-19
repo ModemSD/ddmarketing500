@@ -612,7 +612,7 @@ export function MarketingProductOverview() {
             taxonomyTab === 'domain'
               ? [tax.domain]
               : taxonomyTab === 'format'
-              ? tax.formats
+              ? (tax.multiFormats || tax.formats)
               : tax.hypothesis
               ? [tax.hypothesis]
               : [];
