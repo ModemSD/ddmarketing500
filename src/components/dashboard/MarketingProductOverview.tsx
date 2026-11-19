@@ -120,7 +120,14 @@ export function MarketingProductOverview({
     const spend = rows.reduce((a, r) => a + Number(r.spend || 0), 0);
     const clicks = rows.reduce((a, r) => a + (r.clicks || 0), 0);
     const conv = rows.reduce((a, r) => a + (r.conversions || 0), 0);
-    const inst = rows.reduce((a, r) => a + (r.installs || 0), 0);
+    const paidInst = rows.reduce((a, r) => a + (r.installs || 0), 0);
+    const startupsWithInstalls = new Set(rows.filter((r) => (r.installs || 0) > 0).map((r) => r.startup_id));
+    const organicInst = !excludeOrganic
+      ? mktRows
+          .filter((r) => r.source === 'appmetrica' && startupsWithInstalls.has(r.startup_id))
+          .reduce((a, r) => a + (r.sessions || 0), 0)
+      : 0;
+    const inst = paidInst + organicInst;
     const botStarts = rows.reduce((a, r) => a + (r.bot_starts || 0), 0);
     const spendWithConv = rows.filter((r) => (r.conversions || 0) > 0).reduce((a, r) => a + Number(r.spend || 0), 0);
     const spendWithInstalls = rows.filter((r) => (r.installs || 0) > 0).reduce((a, r) => a + Number(r.spend || 0), 0);
@@ -374,7 +381,7 @@ export function MarketingProductOverview({
                 onChange={(e) => setExcludeOrganic(e.target.checked)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              Без органики
+              Инсталлы без органики
             </label>
           </div>
           <div className="space-y-3">
