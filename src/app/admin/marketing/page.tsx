@@ -57,6 +57,23 @@ export default function MarketingPage() {
   const [vkUploading, setVkUploading] = useState(false);
   const [banner, setBanner] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
+  const [cronLogs, setCronLogs] = useState<Array<{ id: string; sync_date: string; status: string; results: Record<string, unknown>; created_at: string }>>([]);
+  const [runningCron, setRunningCron] = useState(false);
+
+  const loadCronLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/cron-logs', { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok) setCronLogs(data.logs || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    loadCronLogs();
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -696,6 +713,70 @@ export default function MarketingPage() {
           </div>
         </div>
       )}
+      {/* Логи автосинхронизации (Cron) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Логи автосинхронизации (Cron, 09:00 МСК)</h2>
+            <p className="text-xs text-slate-500">История ежедневной выгрузки за прошлый день (Продукт, Яндекс, VK, TG Ads)</p>
+          </div>
+          <button
+            type="button"
+            disabled={runningCron}
+            onClick={async () => {
+              setRunningCron(true);
+              try {
+                await fetch('/api/cron/daily-sync');
+                await loadCronLogs();
+                await loadData();
+              } finally {
+                setRunningCron(false);
+              }
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {runningCron ? 'Синхронизация...' : 'Запустить сейчас'}
+          </button>
+        </div>
+        {cronLogs.length === 0 ? (
+          <div className="text-xs text-slate-400">Логов пока нет (таблица `cron_logs` заполнится после первого запуска).</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-2 pr-3">Время (МСК)</th>
+                  <th className="py-2 pr-3">Дата данных</th>
+                  <th className="py-2 pr-3">Статус</th>
+                  <th className="py-2">Детали</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cronLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="py-2 pr-3 font-mono text-slate-600">
+                      {new Date(log.created_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
+                    </td>
+                    <td className="py-2 pr-3 font-mono">{log.sync_date}</td>
+                    <td className="py-2 pr-3">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          log.status === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {log.status === 'ok' ? 'Успешно' : 'Есть ошибки'}
+                      </span>
+                    </td>
+                    <td className="py-2 font-mono text-[11px] text-slate-500">
+                      {JSON.stringify(log.results).slice(0, 140)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

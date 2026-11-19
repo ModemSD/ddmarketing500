@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -37,14 +38,28 @@ export async function GET(req: NextRequest) {
     }).then((r) => r.json()),
   ]);
 
+  const results = {
+    product: product.status === 'fulfilled' ? product.value : { error: String(product.reason) },
+    yandex: yandex.status === 'fulfilled' ? yandex.value : { error: String(yandex.reason) },
+    vk: vk.status === 'fulfilled' ? vk.value : { error: String(vk.reason) },
+    tg: tg.status === 'fulfilled' ? tg.value : { error: String(tg.reason) },
+  };
+
+  const hasError = Object.values(results).some((r) => r && typeof r === 'object' && 'error' in r && r.error);
+  try {
+    const sb = getSupabaseAdmin();
+    await sb.from('cron_logs').insert({
+      sync_date: yesterday,
+      status: hasError ? 'partial_error' : 'ok',
+      results,
+    });
+  } catch {
+    // ignore if cron_logs table is not created yet
+  }
+
   return NextResponse.json({
     ok: true,
     date: yesterday,
-    results: {
-      product: product.status === 'fulfilled' ? product.value : { error: String(product.reason) },
-      yandex: yandex.status === 'fulfilled' ? yandex.value : { error: String(yandex.reason) },
-      vk: vk.status === 'fulfilled' ? vk.value : { error: String(vk.reason) },
-      tg: tg.status === 'fulfilled' ? tg.value : { error: String(tg.reason) },
-    },
+    results,
   });
 }
