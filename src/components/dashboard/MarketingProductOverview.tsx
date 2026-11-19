@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { HelpCircle, ArrowRight, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { HelpCircle, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 
 interface ProductDay {
@@ -43,15 +43,21 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
-export function MarketingProductOverview() {
+export function MarketingProductOverview({
+  dateFrom: propDateFrom,
+  dateTo: propDateTo,
+}: {
+  dateFrom?: string;
+  dateTo?: string;
+} = {}) {
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);
     d.setUTCDate(d.getUTCDate() - 1);
     return d.toISOString().slice(0, 10);
   };
 
-  const [dateFrom, setDateFrom] = useState('2026-11-05');
-  const [dateTo, setDateTo] = useState(getYesterdayMsk);
+  const dateFrom = propDateFrom || '2026-11-05';
+  const dateTo = propDateTo || getYesterdayMsk();
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,30 +67,6 @@ export function MarketingProductOverview() {
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format' | 'hypothesis'>('domain');
   const [expandedTax, setExpandedTax] = useState<Record<string, boolean>>({});
   const [detailStartup, setDetailStartup] = useState<{ id: string; name: string } | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleExportHtml = () => {
-    if (!containerRef.current) return;
-    const html = `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Дашборд ${dateFrom} — ${dateTo}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 p-6 text-slate-900">
-  <div class="mx-auto max-w-7xl">${containerRef.current.innerHTML}</div>
-</body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `dashboard-${dateFrom}_${dateTo}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -313,36 +295,13 @@ export function MarketingProductOverview() {
   const maxWeekPerDay = Math.max(1, ...weeklyStats.map((w) => w.spendPerDay));
 
   return (
-    <div ref={containerRef} className="space-y-5 border-t border-slate-200 pt-6">
+    <div className="space-y-5 border-t border-slate-200 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Сводка: Маркетинг + Продукт (Unit-экономика)</h2>
           <p className="text-xs text-slate-500">
             Сквозная аналитика от рекламных расходов до реальных пользователей в продукте
           </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <button
-            type="button"
-            onClick={handleExportHtml}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Скачать HTML
-          </button>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-          />
-          <span className="text-slate-400">—</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5"
-          />
         </div>
       </div>
 

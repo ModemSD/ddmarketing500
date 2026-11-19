@@ -153,6 +153,35 @@ function columnLetterToIndex(letter: string): number {
 
 export default function AdminDashboard() {
     const [sidebarTab, setSidebarTab] = useState<SidebarTabId>("dashboard");
+    const [dashDateFrom, setDashDateFrom] = useState("2026-11-05");
+    const [dashDateTo, setDashDateTo] = useState(() => {
+        const d = new Date(Date.now() + 3 * 3600 * 1000);
+        d.setUTCDate(d.getUTCDate() - 1);
+        return d.toISOString().slice(0, 10);
+    });
+    const dashboardRef = useRef<HTMLDivElement>(null);
+    const handleExportDashboardHtml = () => {
+        if (!dashboardRef.current) return;
+        const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Дашборд ${dashDateFrom} — ${dashDateTo}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 p-6 text-slate-900">
+  <div class="mx-auto max-w-7xl">${dashboardRef.current.innerHTML}</div>
+</body>
+</html>`;
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `dashboard-${dashDateFrom}_${dashDateTo}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
     const [loginEmail, setLoginEmail] = useState("");
     const [userRole, setUserRole] = useState<"admin" | "viewer">("admin");
 
@@ -1982,9 +2011,18 @@ export default function AdminDashboard() {
 
                     {/* Если в левом меню выбран Dashboard — рендерим чистый экран Дашборда */}
                     {sidebarTab === "dashboard" ? (
-                        <div className="space-y-8">
-                            <ProductMetricsOverview />
-                            <MarketingProductOverview />
+                        <div ref={dashboardRef} className="space-y-8">
+                            <ProductMetricsOverview
+                                dateFrom={dashDateFrom}
+                                dateTo={dashDateTo}
+                                onDateFromChange={setDashDateFrom}
+                                onDateToChange={setDashDateTo}
+                                onExportHtml={handleExportDashboardHtml}
+                            />
+                            <MarketingProductOverview
+                                dateFrom={dashDateFrom}
+                                dateTo={dashDateTo}
+                            />
                         </div>
                     ) : (
                         <>

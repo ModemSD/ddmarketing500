@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { Activity, Cpu, UserPlus, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface DayRow {
@@ -19,15 +20,31 @@ interface StartupMetrics {
   days: DayRow[];
 }
 
-export function ProductMetricsOverview() {
+export function ProductMetricsOverview({
+  dateFrom: propDateFrom,
+  dateTo: propDateTo,
+  onDateFromChange,
+  onDateToChange,
+  onExportHtml,
+}: {
+  dateFrom?: string;
+  dateTo?: string;
+  onDateFromChange?: (v: string) => void;
+  onDateToChange?: (v: string) => void;
+  onExportHtml?: () => void;
+} = {}) {
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);
     d.setUTCDate(d.getUTCDate() - 1);
     return d.toISOString().slice(0, 10);
   };
 
-  const [dateFrom, setDateFrom] = useState('2026-11-05');
-  const [dateTo, setDateTo] = useState(getYesterdayMsk);
+  const [localDateFrom, setLocalDateFrom] = useState('2026-11-05');
+  const [localDateTo, setLocalDateTo] = useState(getYesterdayMsk);
+  const dateFrom = propDateFrom ?? localDateFrom;
+  const dateTo = propDateTo ?? localDateTo;
+  const setDateFrom = onDateFromChange ?? setLocalDateFrom;
+  const setDateTo = onDateToChange ?? setLocalDateTo;
   const [chartMetric, setChartMetric] = useState<'dau' | 'tool_calls' | 'new_users' | 'depth'>('dau');
   const [hiddenProjects, setHiddenProjects] = useState<Record<string, boolean>>({});
   const [topTab, setTopTab] = useState<'dau' | 'tool_calls' | 'depth' | 'new_users'>('dau');
@@ -245,6 +262,16 @@ export function ProductMetricsOverview() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
+          {onExportHtml && (
+            <button
+              type="button"
+              onClick={onExportHtml}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Скачать HTML
+            </button>
+          )}
           <input
             type="date"
             value={dateFrom}
