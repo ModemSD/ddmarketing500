@@ -377,15 +377,6 @@ export function MarketingProductOverview() {
               </div>
             ))}
           </div>
-          {projectSpendBars.length > 10 && (
-            <button
-              type="button"
-              onClick={() => setShowAllSpendBars((v) => !v)}
-              className="mt-3 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              {showAllSpendBars ? 'Свернуть до 10' : `Показать все (${projectSpendBars.length})`}
-            </button>
-          )}
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
@@ -423,15 +414,6 @@ export function MarketingProductOverview() {
               </div>
             ))}
           </div>
-          {projectSpendBars.length > 10 && (
-            <button
-              type="button"
-              onClick={() => setShowAllSpendBars((v) => !v)}
-              className="mt-3 text-xs font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              {showAllSpendBars ? 'Свернуть до 10' : `Показать все (${projectSpendBars.length})`}
-            </button>
-          )}
         </div>
       </div>
 
