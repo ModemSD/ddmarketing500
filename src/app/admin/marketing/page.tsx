@@ -356,7 +356,7 @@ export default function MarketingPage() {
                             <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
                           </td>
                           <td className="px-3 py-2.5 font-sans text-[11px] text-slate-600">
-                            {(STARTUP_TAXONOMY[r.id]?.formats || []).join(', ') || '—'}
+                            {(STARTUP_TAXONOMY[r.id]?.multiFormats || []).join(', ') || '—'}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold">
                             {r.spend.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}

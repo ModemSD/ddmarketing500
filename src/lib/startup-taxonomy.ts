@@ -1,6 +1,7 @@
 export interface StartupTaxonomy {
   domain: string;
   formats: string[];
+  multiFormats?: string[];
   hypothesis?: string;
   dauDefinition?: string;
 }
@@ -9,6 +10,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '30721': {
     domain: 'Social & Family',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение","PWA"],
     hypothesis: "«Семейный диспетчер»: AI, который делит домашние дела",
     dauDefinition:
       'Количество уникальных пользователей, у которых за календарный день зафиксировано хотя бы одно событие активности: создание желания, назначение дел родителем или завершение миссии ребёнком. Считаем по уникальному ID пользователя. Родитель и ребёнок учитываются как отдельные пользователи. Внутренние и тестовые семьи исключаем.',
@@ -16,12 +18,14 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29886': {
     domain: 'Health & Habits',
     formats: ["Веб-сервис"],
+    multiFormats: ["Telegram-бот","Сайт / веб-приложение"],
     hypothesis: "Место, где можно выговориться",
     dauDefinition: 'DAU — кол-во уникальных пользователей за день, которые писали сообщение либо делали расклад.',
   },
   '29754': {
     domain: 'Health & Habits',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение"],
     hypothesis: "Друг на экране блокировки",
     dauDefinition:
       'Уникальные пользователи, от которых за календарный день по Москве пришёл хотя бы один авторизованный запрос к API: открытие приложения, получение утреннего прогноза, вечерняя отметка, разбор дня, итоги недели, уточняющий вопрос (включая фоновую загрузку уведомления).',
@@ -29,6 +33,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29181': {
     domain: 'Productivity & Work',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение","PWA","Telegram-бот"],
     hypothesis: "Заметки, которые думают",
     dauDefinition:
       'Число уникальных пользователей, которые за календарный день по Москве совершили хотя бы одно целевое действие: сохранение записи, открытие/редактирование заметки, подтверждение напоминания, завершение задачи или запрос к помощнику. Тестовые аккаунты исключаем.',
@@ -36,6 +41,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29008': {
     domain: 'Entertainment & Creativity',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Клипмейкер, который не спит",
     dauDefinition:
       'Все пользователи (включая гостей), которые завершили загрузку видео за сутки по Москве (operation_completed). Тестовые и QA-сессии исключены.',
@@ -43,6 +49,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29210': {
     domain: 'Social & Family',
     formats: ["PWA + Telegram-бот"],
+    multiFormats: ["Сайт / веб-приложение","PWA","Telegram-бот"],
     hypothesis: "Семейный секретарь: из входящих — в календарь",
     dauDefinition:
       'Пользователи, которые за сутки совершили хотя бы одно осознанное действие: сообщение ассистенту, работа с карточкой события, создание/изменение событий, задач, покупок, заметок, команды бота. Просто открытие и просмотр не считаются.',
@@ -50,6 +57,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29442': {
     domain: 'Finance & Everyday Life',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Инвестиции на тренажёре",
     dauDefinition:
       'Количество уникальных user_id, совершивших за UTC-день хотя бы одно действие: лайк/дизлайк новости, комментарий, открытие анализа новости, переход к оценке компании или рынка, отправка собственной новости на анализ.',
@@ -57,6 +65,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29157': {
     domain: 'Health & Habits',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение"],
     hypothesis: "Привычка как игра",
     dauDefinition:
       'Число уникальных пользователей, которые за календарный день по Москве открыли мобильное приложение (iOS или Android) и сделали хотя бы одно действие: записали еду, написали в чат, поставили цель и т.п. Просто открытие и фоновые события не считаются.',
@@ -64,6 +73,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28209': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Наставник для бесконечных «почему»",
     dauDefinition:
       'Число уникальных детей из реальных семей, которые за сутки по МСК сделали хотя бы одно действие в пробе: открыли её, прошли шаг или получили результат.',
@@ -71,6 +81,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29378': {
     domain: 'Entertainment & Creativity',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "Сцена без страха",
     dauDefinition:
       'Число уникальных авторизованных профилей, совершивших игровое действие за календарный день по Москве: открыли экран, написали пост, прочитали ленту и т.п. Анонимные посетители посадочных не входят.',
@@ -78,6 +89,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '30418': {
     domain: 'Learning & Education',
     formats: ["Веб + Telegram-бот"],
+    multiFormats: ["Сайт / веб-приложение","Telegram-бот"],
     hypothesis: "Экзамен по личному маршруту",
     dauDefinition:
       'Уникальный ученик, который за сутки по Москве хотя бы раз получил задание или ответил на него (срез, порция, мини-вариант ЕГЭ, тренажёр, Telegram-бот или Mini App). Просто вход не считается.',
@@ -85,6 +97,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29216': {
     domain: 'Entertainment & Creativity',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "AI-таролог: расклад под твою жизнь",
     dauDefinition:
       'Уникальный пользователь, который за сутки по Москве получил хотя бы один готовый результат в одном из сценариев: личный прогноз, разбор карты, разбор темы, разбор пары, ответ в чате с Сатурном.',
@@ -92,12 +105,14 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '30010': {
     domain: 'Entertainment & Creativity',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "AI-таролог: расклад под твою жизнь",
     dauDefinition: 'Пользователь, сделавший расклад(ы) в этот день.',
   },
   '28766': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение","Мини-приложение MAX","Мобильное приложение"],
     hypothesis: "Тьютор, который объясняет, а не решает",
     dauDefinition:
       'Уникальные реальные пользователи за московские сутки, выполнившие целевое действие своей роли: Ученик/гость — разбор задачи с ответом ИИ; Родитель — свой разбор или просмотр прогресса ребёнка; Учитель — выдача/проверка работы.',
@@ -105,6 +120,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28853': {
     domain: 'Social & Family',
     formats: ["Десктоп (macOS, Windows) + Android-клавиатура"],
+    multiFormats: ["Десктоп-приложение","Клавиатура"],
     hypothesis: "Клавиатура для смелых разговоров",
     dauDefinition:
       'Уникальные ID устройств/аккаунтов с целевым использованием продукта за день по Москве: запрос или показ подсказки, выбор/вставка/отправка ответа, захват контекста. Просто открытие и автозапуск не считаются.',
@@ -112,6 +128,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28431': {
     domain: 'Learning & Education',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "Сказка, где главный герой — твой ребёнок",
     dauDefinition:
       'Разные люди за московские сутки, которые создали сказку и увидели её первую страницу или вернулись и открыли сказку снова. Просто зашедших на сайт и онбординг не считаем.',
@@ -119,6 +136,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29507': {
     domain: 'Entertainment & Creativity',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Переиграть историю: живая AI-песочница",
     dauDefinition:
       'Число уникальных живых аккаунтов, совершивших за сутки по Москве хотя бы одно подтверждённое игровое действие, обработанное ИИ (ход в игре, идея в истории). Открытие, вход и чтение не засчитываются.',
@@ -126,6 +144,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28870': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Тьютор, который объясняет, а не решает",
     dauDefinition:
       'Дети, которые в этот день начали решать задачу (прислали условие текстом или фото, разбор создан) не раньше чем через 8 часов после своего самого первого разбора. Сутки по Москве.',
@@ -133,6 +152,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28778': {
     domain: 'Entertainment & Creativity',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение","Сайт / веб-приложение","Мобильное приложение"],
     hypothesis: "AI-таролог: расклад под твою жизнь",
     dauDefinition:
       'Число уникальных пользователей, совершивших хотя бы одно целевое действие за сутки по МСК: отправивших сообщение/голосовой запрос, запросивших Карту дня либо этап расклада.',
@@ -140,6 +160,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29453': {
     domain: 'Health & Habits',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "Привычка как игра",
     dauDefinition:
       'Число уникальных реальных игроков за сутки по Москве, сделавших хотя бы одно из 43 целевых действий (отметка дела/привычки, сообщение медведю, голосовой ввод, действие в боте и т.д.). Фоновые события не считаются.',
@@ -147,6 +168,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29955': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Экзамен по личному маршруту",
     dauDefinition:
       'Пользователь, выполнивший целевое действие: создание блокнота, генерация материала, заявка на курс, просмотр материала/модуля, завершение модуля, выполнение задания/проверки, сообщение ментору.',
@@ -154,6 +176,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29197': {
     domain: 'Learning & Education',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "Произношение без стеснения",
     dauDefinition:
       'Число разных пользователей, которые за сутки по Москве хотя бы раз сделали любое действие в продукте: написали боту, отправили голосовое, нажали кнопку.',
@@ -161,6 +184,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29448': {
     domain: 'Social & Family',
     formats: ["Telegram-бот"],
+    multiFormats: ["Telegram-бот"],
     hypothesis: "Клавиатура для смелых разговоров",
     dauDefinition:
       'Уникальные пользователи за сутки по Москве, у которых была хотя бы одна операция агента (tool call), включая фоновое чтение сообщения и генерацию вариантов ответа. Приложение + боты + Mini App.',
@@ -168,23 +192,27 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '27719': {
     domain: 'Entertainment & Creativity',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Примерочная без примерки",
     dauDefinition: 'Пользователь, который совершил хотя бы одно действие в системе (начало примерки, генерация вещи, регистрация и т.п.).',
   },
   '29259': {
     domain: 'Social & Family',
     formats: ["Веб-клавиатура; нативное iOS-приложение в работе"],
+    multiFormats: ["Мобильное приложение","Клавиатура","Сайт / веб-приложение"],
     hypothesis: "Мем-дилер: клавиатура, которая шутит вовремя",
   },
   '27569': {
     domain: 'Learning & Education',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение","Telegram-бот"],
     hypothesis: "Произношение без стеснения",
     dauDefinition: 'Те, кто хотя бы один раз общался с нейронкой.',
   },
   '29240': {
     domain: 'Другое',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Другое",
     dauDefinition:
       'Первый заход: настроили подборку под себя; повторный заход: скролл ленты рецептов (польза в выборе рецепта).',
@@ -192,6 +220,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28026': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Сказка, где главный герой — твой ребёнок",
     dauDefinition:
       'Число уникальных аккаунтов с целевым действием за сутки: работа над сказкой, запуск иллюстраций, публикация либо подтверждённое дочитывание. Вход и регистрация не считаются.',
@@ -199,6 +228,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '30211': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Язык голосами любимых героев",
     dauDefinition:
       'Количество уникальных устройств, на которых за сутки произошло действие: задан голосом вопрос / выбрана тема, запрос деталей открытия, открытие сохранённого или повтор рассказа.',
@@ -206,6 +236,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28214': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Лаборатория в одном окне",
     dauDefinition:
       'Число уникальных пользователей за день по МСК, совершивших целевое действие: запрос плана работы, вопрос ИИ-помощнику, поиск/добавление источника, проверка по ГОСТу, загрузка/выгрузка документа.',
@@ -213,6 +244,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29452': {
     domain: 'Productivity & Work',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение","Сайт / веб-приложение","PWA","Telegram-бот","Telegram мини-приложение"],
     hypothesis: "Агент на шаг впереди",
     dauDefinition:
       'Количество уникальных пользователей, совершивших хотя бы одно целевое действие в Капле за день: создание цели, создание задачи, сообщение капле, включение режима фокуса.',
@@ -220,6 +252,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28554': {
     domain: 'Learning & Education',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение","Сайт / веб-приложение"],
     hypothesis: "Тьютор, который объясняет, а не решает",
     dauDefinition:
       'Пользователь поставил себе цель и сгенерировал путь, либо пользователь с ранее сгенерированной целью заходит в игру и начинает урок.',
@@ -227,6 +260,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29499': {
     domain: 'Productivity & Work',
     formats: ["Мобильное приложение"],
+    multiFormats: ["Мобильное приложение"],
     hypothesis: "Заметки, которые думают",
     dauDefinition:
       'Считается по событию session_start: открытие приложения (с рабочего стола, уведомления, виджета), сохранение мысли вне приложения, отметка/перенос напоминания.',
@@ -234,12 +268,14 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29271': {
     domain: 'Social & Family',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение","PWA","Telegram-бот"],
     hypothesis: "Игра в себя: саморефлексия через AI-истории",
     dauDefinition: 'Количество уникальных пользователей, совершивших хотя бы одно целевое действие за календарный день по Москве.',
   },
   '29463': {
     domain: 'Learning & Education',
     formats: ["Мини-приложение в MAX и Telegram"],
+    multiFormats: ["Telegram мини-приложение","Мини-приложение MAX"],
     hypothesis: "Тьютор, который объясняет, а не решает",
     dauDefinition:
       'Тот, у кого за сутки в работе появилась хотя бы 1 задача: прислал собственную (фото, текст, решение) либо сгенерировал её.',
@@ -247,6 +283,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29247': {
     domain: 'Health & Habits',
     formats: ["Telegram мини-приложение"],
+    multiFormats: ["Telegram мини-приложение"],
     hypothesis: "Место, где можно выговориться",
     dauDefinition:
       'Число уникальных пользователей за сутки по МСК, которые хотя бы раз написали боту или выполнили действие с обращением к ИИ (при условии >= 2 сообщений боту ранее).',
@@ -254,6 +291,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29401': {
     domain: 'Entertainment & Creativity',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Песня без студии",
     dauDefinition:
       'Число уникальных пользователей за сутки по МСК с целевым действием: «Напеть», запись, работа в студии/конструкторе, генерация/редактирование текста, прослушивание, скачивание/шаринг трека или игра.',
@@ -261,12 +299,14 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28497': {
     domain: 'Health & Habits',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение","PWA"],
     hypothesis: "Место, где можно выговориться",
     dauDefinition: 'Люди, у которых больше 1 реплики за сутки по Москве.',
   },
   '29203': {
     domain: 'Productivity & Work',
     formats: ["Веб-сервис"],
+    multiFormats: ["Сайт / веб-приложение"],
     hypothesis: "Напарник по фокусу",
     dauDefinition:
       'Уникальные пользователи за сутки по МСК с целевым действием: запись/диктовка дел, разбор ИИ, выбор/выполнение Главного дня, цель, фокус-сессия. Открытие и вход не считаются.',
@@ -274,6 +314,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29198': {
     domain: 'Productivity & Work',
     formats: ["Веб + Telegram-бот"],
+    multiFormats: ["Сайт / веб-приложение","PWA","Telegram-бот"],
     hypothesis: "Агент на шаг впереди",
     dauDefinition:
       'Человек, совершивший 1 целевое действие за день: работа с календарём/событиями/файлами, AI-ассистентом/напоминаниями, интеграциями или целевыми формами сайта.',
