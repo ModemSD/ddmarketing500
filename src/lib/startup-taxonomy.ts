@@ -120,7 +120,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '28853': {
     domain: 'Social & Family',
     formats: ["Десктоп (macOS, Windows) + Android-клавиатура"],
-    multiFormats: ["Десктоп-приложение","Клавиатура"],
+    multiFormats: ["Десктоп-приложение","Мобильное приложение"],
     hypothesis: "Клавиатура для смелых разговоров",
     dauDefinition:
       'Уникальные ID устройств/аккаунтов с целевым использованием продукта за день по Москве: запрос или показ подсказки, выбор/вставка/отправка ответа, захват контекста. Просто открытие и автозапуск не считаются.',
@@ -184,7 +184,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29448': {
     domain: 'Social & Family',
     formats: ["Telegram-бот"],
-    multiFormats: ["Telegram-бот"],
+    multiFormats: ["Telegram-бот","Мобильное приложение"],
     hypothesis: "Клавиатура для смелых разговоров",
     dauDefinition:
       'Уникальные пользователи за сутки по Москве, у которых была хотя бы одна операция агента (tool call), включая фоновое чтение сообщения и генерацию вариантов ответа. Приложение + боты + Mini App.',
@@ -199,7 +199,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '29259': {
     domain: 'Social & Family',
     formats: ["Веб-клавиатура; нативное iOS-приложение в работе"],
-    multiFormats: ["Мобильное приложение","Клавиатура","Сайт / веб-приложение"],
+    multiFormats: ["Мобильное приложение","Сайт / веб-приложение"],
     hypothesis: "Мем-дилер: клавиатура, которая шутит вовремя",
   },
   '27569': {
@@ -228,7 +228,7 @@ export const STARTUP_TAXONOMY: Record<string, StartupTaxonomy> = {
   '30211': {
     domain: 'Learning & Education',
     formats: ["Веб-сервис"],
-    multiFormats: ["Сайт / веб-приложение"],
+    multiFormats: ["Сайт / веб-приложение","Мобильное приложение"],
     hypothesis: "Язык голосами любимых героев",
     dauDefinition:
       'Количество уникальных устройств, на которых за сутки произошло действие: задан голосом вопрос / выбрана тема, запрос деталей открытия, открытие сохранённого или повтор рассказа.',
