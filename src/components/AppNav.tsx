@@ -12,6 +12,7 @@ import {
   Database,
   BarChart3,
   Megaphone,
+  History,
 } from "lucide-react";
 
 export type SidebarTabId = "dashboard" | "telegram_bot";
@@ -58,7 +59,8 @@ export function AppNav({
   const isStartupsPage = pathname?.startsWith("/admin/startups");
   const isProductMetricsPage = pathname?.startsWith("/admin/product-metrics");
   const isMarketingPage = pathname?.startsWith("/admin/marketing");
-  const isSubPage = isStartupsPage || isProductMetricsPage || isMarketingPage;
+  const isLogsPage = pathname?.startsWith("/admin/logs");
+  const isSubPage = isStartupsPage || isProductMetricsPage || isMarketingPage || isLogsPage;
 
   return (
     <aside
@@ -160,6 +162,21 @@ export function AppNav({
                         }`}
                       />
                       <span className="truncate">Маркетинг</span>
+                    </Link>
+                    <Link
+                      href="/admin/logs"
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
+                        isLogsPage
+                          ? "bg-indigo-50 text-indigo-700 font-semibold"
+                          : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      }`}
+                    >
+                      <History
+                        className={`w-3.5 h-3.5 shrink-0 ${
+                          isLogsPage ? "text-indigo-600" : "text-slate-400"
+                        }`}
+                      />
+                      <span className="truncate">Логи</span>
                     </Link>
                   </div>
                 )}
