@@ -824,7 +824,7 @@ export function MarketingProductOverview() {
                     )}
                   </div>
                 </td>
-                <td className="py-2 text-slate-600">
+                <td className="max-w-[170px] py-2 pr-3 font-sans text-[10px] leading-tight text-slate-500">
                   {(STARTUP_TAXONOMY[r.id]?.multiFormats || []).join(', ') || '—'}
                 </td>
                 <td className="py-2 text-right font-semibold">{Math.round(r.spend).toLocaleString('ru-RU')}</td>
