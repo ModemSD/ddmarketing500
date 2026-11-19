@@ -10,6 +10,7 @@ interface ProductDay {
   llm_requests: number;
   tool_requests: number;
   new_users: number;
+  total_users?: number;
 }
 
 interface StartupProduct {
@@ -54,7 +55,7 @@ export function MarketingProductOverview() {
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'dau' | 'depth' | 'cost_dau'>('spend');
+  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format' | 'hypothesis'>('domain');
@@ -173,6 +174,7 @@ export function MarketingProductOverview() {
       name: s.name,
       spend,
       newUsers,
+      totalUsers: sortedDays[0]?.total_users || 0,
       cac: newUsers > 0 ? Math.round(spend / newUsers) : 0,
       installs,
       cpi: installs > 0 ? Math.round(spend / installs) : 0,
@@ -197,6 +199,7 @@ export function MarketingProductOverview() {
         spend: a.spend - b.spend,
         cac: a.cac - b.cac,
         new_users: a.newUsers - b.newUsers,
+        total_users: a.totalUsers - b.totalUsers,
         dau: a.avgDau - b.avgDau,
         depth: a.depth - b.depth,
         cost_dau: a.costPerDau - b.costPerDau,
@@ -772,6 +775,9 @@ export function MarketingProductOverview() {
               <th onClick={() => handleSort('new_users')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 New Users {sortBy === 'new_users' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
+              <th onClick={() => handleSort('total_users')} className="cursor-pointer py-2 text-right hover:text-slate-900">
+                Total Users {sortBy === 'total_users' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+              </th>
               <th onClick={() => handleSort('cac')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 CAC (₽) {sortBy === 'cac' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
@@ -814,6 +820,7 @@ export function MarketingProductOverview() {
                 </td>
                 <td className="py-2 text-right font-semibold">{Math.round(r.spend).toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.newUsers.toLocaleString('ru-RU')}</td>
+                <td className="py-2 text-right">{r.totalUsers.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right font-semibold text-indigo-600">{r.cac > 0 ? r.cac : '—'}</td>
                 <td className="py-2 text-right">{r.cpi > 0 ? r.cpi : '—'}</td>
                 <td className="py-2 text-right">{r.avgDau.toLocaleString('ru-RU')}</td>
@@ -827,6 +834,7 @@ export function MarketingProductOverview() {
               <td className="py-2.5 font-sans">Итого / Среднее ({sortedUnit.length})</td>
               <td className="py-2.5 text-right">{Math.round(totalSpend).toLocaleString('ru-RU')}</td>
               <td className="py-2.5 text-right">{totalNewUsers.toLocaleString('ru-RU')}</td>
+              <td className="py-2.5 text-right">{sortedUnit.reduce((a, r) => a + r.totalUsers, 0).toLocaleString('ru-RU')}</td>
               <td className="py-2.5 text-right text-indigo-600">
                 {totalNewUsers > 0 ? Math.round(totalSpend / totalNewUsers) : '—'}
               </td>
