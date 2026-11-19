@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AppNav } from '@/components/AppNav';
 
 interface CronLog {
   id: string;
@@ -11,6 +13,8 @@ interface CronLog {
 }
 
 export default function AdminLogsPage() {
+  const router = useRouter();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [logs, setLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -41,8 +45,18 @@ export default function AdminLogsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl space-y-5">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      <AppNav
+        activeSection="dashboard"
+        onSelectSection={(section) =>
+          router.push(section === 'telegram_bot' ? '/?tab=telegram_bot' : '/')
+        }
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        onLogout={() => router.push('/')}
+      />
+      <div className="flex-1 p-6">
+        <div className="mx-auto max-w-6xl space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Логи автосинхронизации</h1>
@@ -102,6 +116,7 @@ export default function AdminLogsPage() {
               </table>
             )}
           </div>
+        </div>
       </div>
     </div>
   );
