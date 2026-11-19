@@ -82,11 +82,7 @@ function getRedis(): Redis | null {
   if (url && token) {
     return new Redis({ url, token });
   }
-  try {
-    return Redis.fromEnv();
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function getLocalFilePath(): string {
@@ -105,20 +101,7 @@ export function extractProjectIdFromTitle(title?: string): string | null {
   return match ? match[1] : null;
 }
 
-const DEFAULT_INITIAL_CHATS: Record<string, StartupChat> = {
-  "26666": {
-    projectId: "26666",
-    chatId: "-5560094301",
-    title: "26666 Marketing Unit",
-    updatedAt: "2026-11-11T08:40:00.000Z",
-  },
-  "25555": {
-    projectId: "25555",
-    chatId: "-5257696187",
-    title: "25555 Marketing Unit",
-    updatedAt: "2026-11-11T08:40:00.000Z",
-  },
-};
+const DEFAULT_INITIAL_CHATS: Record<string, StartupChat> = {};
 
 export async function getAllChats(): Promise<Record<string, StartupChat>> {
   const redis = getRedis();
@@ -183,186 +166,7 @@ function getLocalPollsFilePath(): string {
   return path.join(dir, "polls.json");
 }
 
-const DEFAULT_INITIAL_POLLS: PollCampaign[] = [
-  {
-    id: "poll_1794402829728",
-    folder: "123",
-    question: "123123",
-    options: ["Да, всё готово", "В процессе", "Нужна помощь"],
-    isAnonymous: false,
-    allowsMultipleAnswers: false,
-    createdAt: "2026-11-11T13:13:49.728Z",
-    chats: {
-      "25555": {
-        pollId: "5449755947444476082",
-        projectId: "25555",
-        chatId: "-5257696187",
-        chatTitle: "25555 Marketing Unit",
-        messageId: 22,
-        totalVoterCount: 1,
-        options: [
-          { text: "Да, всё готово", voterCount: 0 },
-          { text: "В процессе", voterCount: 1 },
-          { text: "Нужна помощь", voterCount: 0 },
-        ],
-        voters: {
-          "1145547373": {
-            userId: "1145547373",
-            name: "Dmitrii",
-            username: "envyzzz",
-            optionIds: [1],
-            votedAt: "2026-11-11T13:19:20.932Z",
-          },
-        },
-        updatedAt: "2026-11-11T13:19:20.932Z",
-      },
-      "26666": {
-        pollId: "5449675721750353643",
-        projectId: "26666",
-        chatId: "-5560094301",
-        chatTitle: "26666 Marketing Unit",
-        messageId: 23,
-        totalVoterCount: 1,
-        options: [
-          { text: "Да, всё готово", voterCount: 1 },
-          { text: "В процессе", voterCount: 0 },
-          { text: "Нужна помощь", voterCount: 0 },
-        ],
-        voters: {
-          "1145547373": {
-            userId: "1145547373",
-            name: "Dmitrii",
-            username: "envyzzz",
-            optionIds: [0],
-            votedAt: "2026-11-11T13:15:17.913Z",
-          },
-        },
-        updatedAt: "2026-11-11T13:15:17.913Z",
-      },
-    },
-  },
-  {
-    id: "poll_1794402126814",
-    folder: "Маркетинг",
-    question: "а?",
-    options: ["12321", "1323", "1231233123"],
-    isAnonymous: false,
-    allowsMultipleAnswers: false,
-    createdAt: "2026-11-11T13:02:06.814Z",
-    chats: {
-      "25555": {
-        pollId: "5449755947444476077",
-        projectId: "25555",
-        chatId: "-5257696187",
-        chatTitle: "25555 Marketing Unit",
-        messageId: 20,
-        totalVoterCount: 1,
-        options: [
-          { text: "12321", voterCount: 0 },
-          { text: "1323", voterCount: 1 },
-          { text: "1231233123", voterCount: 0 },
-        ],
-        voters: {
-          "308047978": {
-            userId: "308047978",
-            name: "Dmitrii Manapov",
-            username: "dmanapoff",
-            optionIds: [1],
-            votedAt: "2026-11-11T13:02:30.000Z",
-          },
-        },
-        updatedAt: "2026-11-11T13:02:30.000Z",
-      },
-      "26666": {
-        pollId: "5449675721750353631",
-        projectId: "26666",
-        chatId: "-5560094301",
-        chatTitle: "26666 Marketing Unit",
-        messageId: 21,
-        totalVoterCount: 1,
-        options: [
-          { text: "12321", voterCount: 0 },
-          { text: "1323", voterCount: 1 },
-          { text: "1231233123", voterCount: 0 },
-        ],
-        voters: {
-          "308047978": {
-            userId: "308047978",
-            name: "Dmitrii Manapov",
-            username: "dmanapoff",
-            optionIds: [1],
-            votedAt: "2026-11-11T13:02:30.000Z",
-          },
-        },
-        updatedAt: "2026-11-11T13:02:30.000Z",
-      },
-    },
-  },
-  {
-    id: "poll_initial_kak_dela",
-    folder: "Неделя 1",
-    question: "Как дела?",
-    options: ["Да, всё готово", "В процессе", "Нужна помощь"],
-    isAnonymous: false,
-    allowsMultipleAnswers: false,
-    createdAt: "2026-11-11T12:33:29.000Z",
-    chats: {
-      "25555": {
-        pollId: "5449755947444476064",
-        projectId: "25555",
-        chatId: "-5257696187",
-        chatTitle: "25555 Marketing Unit",
-        messageId: 16,
-        totalVoterCount: 1,
-        options: [
-          { text: "Да, всё готово", voterCount: 0 },
-          { text: "В процессе", voterCount: 0 },
-          { text: "Нужна помощь", voterCount: 1 },
-        ],
-        voters: {
-          "308047978": {
-            userId: "308047978",
-            name: "Dmitrii Manapov",
-            username: "dmanapoff",
-            optionIds: [2],
-            votedAt: "2026-11-11T12:34:00.000Z",
-          },
-        },
-        updatedAt: "2026-11-11T12:34:00.000Z",
-      },
-      "26666": {
-        pollId: "5449675721750353617",
-        projectId: "26666",
-        chatId: "-5560094301",
-        chatTitle: "26666 Marketing Unit",
-        messageId: 18,
-        totalVoterCount: 2,
-        options: [
-          { text: "Да, всё готово", voterCount: 1 },
-          { text: "В процессе", voterCount: 0 },
-          { text: "Нужна помощь", voterCount: 1 },
-        ],
-        voters: {
-          "308047978": {
-            userId: "308047978",
-            name: "Dmitrii Manapov",
-            username: "dmanapoff",
-            optionIds: [0],
-            votedAt: "2026-11-11T12:34:00.000Z",
-          },
-          "1145547373": {
-            userId: "1145547373",
-            name: "Dmitrii",
-            username: "envyzzz",
-            optionIds: [2],
-            votedAt: "2026-11-11T13:02:15.000Z",
-          },
-        },
-        updatedAt: "2026-11-11T13:02:15.000Z",
-      },
-    },
-  },
-];
+const DEFAULT_INITIAL_POLLS: PollCampaign[] = [];
 
 export async function getAllPolls(): Promise<PollCampaign[]> {
   const redis = getRedis();

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bot500 — Админка рассылок по стартапам",
-  description: "Мини-админка для массовых и индивидуальных рассылок из Google Таблиц в Telegram-чаты стартапов",
+  title: "DISRUPT × SBER500 — Аналитика и управление портфелем",
+  description: "Единая аналитическая платформа: продуктовые метрики, маркетинг и управление стартапами",
 };
 
 export default function RootLayout({
