@@ -35,6 +35,10 @@ export default function MarketingPage() {
   const [dateTo, setDateTo] = useState(getYesterdayMsk);
   const [sourceFilter, setSourceFilter] = useState('all');
   const [includeOrganic, setIncludeOrganic] = useState(true);
+  const [sortBy, setSortBy] = useState<
+    'spend' | 'impressions' | 'clicks' | 'ctr' | 'cpc' | 'conversions' | 'cpa' | 'installs' | 'cpi'
+  >('spend');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const [startups, setStartups] = useState<{ id: string; name: string }[]>([]);
   const [metrics, setMetrics] = useState<MarketingRow[]>([]);
@@ -132,6 +136,14 @@ export default function MarketingPage() {
   const filteredMetrics =
     sourceFilter === 'all' ? metrics : metrics.filter((m) => m.source === sourceFilter);
 
+  const handleSort = (col: typeof sortBy) => {
+    if (sortBy === col) setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    else {
+      setSortBy(col);
+      setSortDir('desc');
+    }
+  };
+
   const aggregated = startups
     .map((s) => {
       const rows = filteredMetrics.filter((m) => m.startup_id === s.id);
@@ -160,7 +172,7 @@ export default function MarketingPage() {
         sessions,
       };
     })
-    .sort((a, b) => b.spend - a.spend);
+    .sort((a, b) => (sortDir === 'desc' ? b[sortBy] - a[sortBy] : a[sortBy] - b[sortBy]));
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -285,15 +297,33 @@ export default function MarketingPage() {
                   <th className="w-8 px-2 py-3"></th>
                   <th className="px-4 py-3">Проект</th>
                   <th className="px-3 py-3">Форм-фактор</th>
-                  <th className="px-3 py-3 text-right">Расход (₽)</th>
-                  <th className="px-3 py-3 text-right">Показы</th>
-                  <th className="px-3 py-3 text-right">Клики</th>
-                  <th className="px-3 py-3 text-right">CTR %</th>
-                  <th className="px-3 py-3 text-right">CPC</th>
-                  <th className="px-3 py-3 text-right">Цел. действ.</th>
-                  <th className="px-3 py-3 text-right">CPA</th>
-                  <th className="px-3 py-3 text-right">Установки</th>
-                  <th className="px-3 py-3 text-right">CPI</th>
+                  <th onClick={() => handleSort('spend')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    Расход (₽) {sortBy === 'spend' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('impressions')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    Показы {sortBy === 'impressions' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('clicks')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    Клики {sortBy === 'clicks' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('ctr')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    CTR % {sortBy === 'ctr' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('cpc')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    CPC {sortBy === 'cpc' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('conversions')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    Цел. действ. {sortBy === 'conversions' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('cpa')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    CPA {sortBy === 'cpa' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('installs')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    Установки {sortBy === 'installs' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
+                  <th onClick={() => handleSort('cpi')} className="cursor-pointer px-3 py-3 text-right hover:text-slate-900">
+                    CPI {sortBy === 'cpi' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-mono">
