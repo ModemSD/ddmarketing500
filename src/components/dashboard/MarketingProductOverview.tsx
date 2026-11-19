@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { HelpCircle, ArrowRight } from 'lucide-react';
+import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 
 interface ProductDay {
   date: string;
@@ -56,6 +57,7 @@ export function MarketingProductOverview() {
   const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
+  const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format'>('domain');
 
   useEffect(() => {
     let cancelled = false;
@@ -661,6 +663,91 @@ export function MarketingProductOverview() {
           </tfoot>
         </table>
       </div>
+
+      {/* 8. Сравнение по Доменам и Форм-факторам */}
+      {(() => {
+        const groupMap: Record<
+          string,
+          { label: string; projects: number; spend: number; newUsers: number; sumDau: number; sumDepth: number }
+        > = {};
+
+        for (const r of unitRows) {
+          const tax = STARTUP_TAXONOMY[r.id];
+          if (!tax) continue;
+          const keys = taxonomyTab === 'domain' ? [tax.domain] : tax.formats;
+          for (const k of keys) {
+            if (!groupMap[k]) {
+              groupMap[k] = { label: k, projects: 0, spend: 0, newUsers: 0, sumDau: 0, sumDepth: 0 };
+            }
+            groupMap[k].projects += 1;
+            groupMap[k].spend += r.spend;
+            groupMap[k].newUsers += r.newUsers;
+            groupMap[k].sumDau += r.sumDau;
+            groupMap[k].sumDepth += r.depth;
+          }
+        }
+
+        const taxRows = Object.values(groupMap).sort((a, b) => b.spend - a.spend);
+
+        return (
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                Срез по типам стартапов и форм-факторам
+                <InfoTip text="Сравнение эффективности по доменам (вертикалям) и форм-факторам (веб, мобайл, TG-бот и т.д.). Если у стартапа несколько форм-факторов, он учитывается в каждом из них." />
+              </div>
+              <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTaxonomyTab('domain')}
+                  className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                    taxonomyTab === 'domain' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  По Доменам
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTaxonomyTab('format')}
+                  className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                    taxonomyTab === 'format' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  По Форм-факторам
+                </button>
+              </div>
+            </div>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-2">{taxonomyTab === 'domain' ? 'Домен' : 'Форм-фактор'}</th>
+                  <th className="py-2 text-right">Проектов</th>
+                  <th className="py-2 text-right">Расход (₽)</th>
+                  <th className="py-2 text-right">New Users</th>
+                  <th className="py-2 text-right">Ср. CAC (₽)</th>
+                  <th className="py-2 text-right">Сумма DAU</th>
+                  <th className="py-2 text-right">Ср. Глубина ИИ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono">
+                {taxRows.map((t) => (
+                  <tr key={t.label} className="hover:bg-slate-50/70">
+                    <td className="py-2 font-sans font-medium text-slate-900">{t.label}</td>
+                    <td className="py-2 text-right">{t.projects}</td>
+                    <td className="py-2 text-right font-semibold">{Math.round(t.spend).toLocaleString('ru-RU')}</td>
+                    <td className="py-2 text-right">{t.newUsers.toLocaleString('ru-RU')}</td>
+                    <td className="py-2 text-right font-semibold text-indigo-600">
+                      {t.newUsers > 0 ? Math.round(t.spend / t.newUsers) : '—'}
+                    </td>
+                    <td className="py-2 text-right">{t.sumDau.toLocaleString('ru-RU')}</td>
+                    <td className="py-2 text-right">{t.projects > 0 ? (t.sumDepth / t.projects).toFixed(1) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
     </div>
   );
 }
