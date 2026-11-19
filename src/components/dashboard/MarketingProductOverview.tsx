@@ -813,18 +813,6 @@ export function MarketingProductOverview() {
                   <div className="flex items-center gap-1.5">
                     <span className="font-medium text-slate-900">{r.name}</span>
                     <span className="font-mono text-slate-400">{r.id}</span>
-                    {STARTUP_TAXONOMY[r.id]?.dauDefinition && (
-                      <div
-                        className="group relative inline-flex items-center"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <HelpCircle className="h-3.5 w-3.5 cursor-help text-slate-400 hover:text-indigo-600" />
-                        <div className="pointer-events-none absolute left-0 top-5 z-30 hidden w-80 rounded-lg bg-slate-900 p-2.5 text-[11px] font-normal leading-relaxed text-white shadow-xl group-hover:block">
-                          <div className="mb-1 font-semibold text-indigo-300">Как считается DAU:</div>
-                          {STARTUP_TAXONOMY[r.id].dauDefinition}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </td>
                 <td className="max-w-[170px] py-2 pr-3 font-sans text-[10px] leading-tight text-slate-500">
@@ -835,7 +823,23 @@ export function MarketingProductOverview() {
                 <td className="py-2 text-right">{r.totalUsers.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right font-semibold text-indigo-600">{r.cac > 0 ? r.cac : '—'}</td>
                 <td className="py-2 text-right">{r.cpi > 0 ? r.cpi : '—'}</td>
-                <td className="py-2 text-right">{r.avgDau.toLocaleString('ru-RU')}</td>
+                <td className="py-2 text-right">
+                  <div className="inline-flex items-center justify-end gap-1">
+                    <span>{r.avgDau.toLocaleString('ru-RU')}</span>
+                    {STARTUP_TAXONOMY[r.id]?.dauDefinition && (
+                      <div
+                        className="group relative inline-flex items-center font-sans"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <HelpCircle className="h-3.5 w-3.5 cursor-help text-slate-400 hover:text-indigo-600" />
+                        <div className="pointer-events-none absolute right-0 top-5 z-30 hidden w-80 rounded-lg bg-slate-900 p-2.5 text-left text-[11px] font-normal leading-relaxed text-white shadow-xl group-hover:block">
+                          <div className="mb-1 font-semibold text-indigo-300">Как считается DAU:</div>
+                          {STARTUP_TAXONOMY[r.id].dauDefinition}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </td>
                 <td className="py-2 text-right">{r.maxDau.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.depth}</td>
                 <td className="py-2 text-right">{r.costPerDau > 0 ? r.costPerDau : '—'}</td>
