@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 import {
   Plus,
   RefreshCw,
@@ -345,6 +346,21 @@ export default function AdminStartupsPage() {
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-900">{s.name}</div>
                       <div className="font-mono text-xs text-slate-500">ID: {s.id}</div>
+                      {STARTUP_TAXONOMY[s.id] && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                            {STARTUP_TAXONOMY[s.id].domain}
+                          </span>
+                          {STARTUP_TAXONOMY[s.id].formats.map((f) => (
+                            <span
+                              key={f}
+                              className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
+                            >
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {s.api_url ? (
