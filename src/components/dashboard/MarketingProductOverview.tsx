@@ -67,6 +67,7 @@ export function MarketingProductOverview({
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format' | 'hypothesis'>('domain');
   const [expandedTax, setExpandedTax] = useState<Record<string, boolean>>({});
   const [detailStartup, setDetailStartup] = useState<{ id: string; name: string } | null>(null);
+  const [excludeOrganic, setExcludeOrganic] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +98,7 @@ export function MarketingProductOverview({
   const totalClicks = mktRows.reduce((a, r) => a + (r.clicks || 0), 0);
   const totalConversions = mktRows.reduce((a, r) => a + (r.conversions || 0), 0);
   const totalInstalls = mktRows.reduce(
-    (a, r) => a + (r.installs || 0) + (r.source === 'appmetrica' ? r.sessions || 0 : 0),
+    (a, r) => a + (r.installs || 0) + (!excludeOrganic && r.source === 'appmetrica' ? r.sessions || 0 : 0),
     0
   );
   const totalNewUsers = prodStartups.reduce(
@@ -166,7 +167,7 @@ export function MarketingProductOverview({
     const mForS = mktRows.filter((r) => r.startup_id === s.id);
     const spend = mForS.reduce((a, r) => a + Number(r.spend || 0), 0);
     const installs = mForS.reduce(
-      (a, r) => a + (r.installs || 0) + (r.source === 'appmetrica' ? r.sessions || 0 : 0),
+      (a, r) => a + (r.installs || 0) + (!excludeOrganic && r.source === 'appmetrica' ? r.sessions || 0 : 0),
       0
     );
 
@@ -361,9 +362,20 @@ export function MarketingProductOverview({
       {/* 2. Срез по каналам + 3. Динамика Расход vs New Users */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            Эффективность каналов
-            <InfoTip text="Сравнение Яндекс Директа, VK Ads и TG Ads: доля бюджета, средний CPC (Расход/Клики), CPA (Расход/Конверсии), CPI (Расход/Установки) и CPA TG (Расход/Старты бота)." />
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              Эффективность каналов
+              <InfoTip text="Сравнение Яндекс Директа, VK Ads и TG Ads: доля бюджета, средний CPC (Расход/Клики), CPA (Расход/Конверсии), CPI (Расход/Установки) и CPA TG (Расход/Старты бота)." />
+            </div>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={excludeOrganic}
+                onChange={(e) => setExcludeOrganic(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Без органики
+            </label>
           </div>
           <div className="space-y-3">
             {channelStats.map((c) => (
