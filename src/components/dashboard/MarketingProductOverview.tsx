@@ -55,7 +55,7 @@ export function MarketingProductOverview() {
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'depth' | 'cost_dau'>('spend');
+  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'max_dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format' | 'hypothesis'>('domain');
@@ -180,6 +180,7 @@ export function MarketingProductOverview() {
       cpi: installs > 0 ? Math.round(spend / installs) : 0,
       sumDau,
       avgDau: pDays.length > 0 ? Math.round(sumDau / pDays.length) : 0,
+      maxDau: pDays.length > 0 ? Math.max(...pDays.map((d) => d.dau)) : 0,
       depth: sumDau > 0 ? Number((sumTc / sumDau).toFixed(1)) : 0,
       costPerDau: sumDau > 0 ? Math.round(spend / sumDau) : 0,
       growthPct,
@@ -201,6 +202,7 @@ export function MarketingProductOverview() {
         new_users: a.newUsers - b.newUsers,
         total_users: a.totalUsers - b.totalUsers,
         dau: a.avgDau - b.avgDau,
+        max_dau: a.maxDau - b.maxDau,
         depth: a.depth - b.depth,
         cost_dau: a.costPerDau - b.costPerDau,
       };
@@ -785,6 +787,9 @@ export function MarketingProductOverview() {
               <th onClick={() => handleSort('dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Ср. DAU {sortBy === 'dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
+              <th onClick={() => handleSort('max_dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
+                Макс. DAU {sortBy === 'max_dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+              </th>
               <th onClick={() => handleSort('depth')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Ср. глубина ИИ {sortBy === 'depth' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
@@ -824,6 +829,7 @@ export function MarketingProductOverview() {
                 <td className="py-2 text-right font-semibold text-indigo-600">{r.cac > 0 ? r.cac : '—'}</td>
                 <td className="py-2 text-right">{r.cpi > 0 ? r.cpi : '—'}</td>
                 <td className="py-2 text-right">{r.avgDau.toLocaleString('ru-RU')}</td>
+                <td className="py-2 text-right">{r.maxDau.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.depth}</td>
                 <td className="py-2 text-right">{r.costPerDau > 0 ? r.costPerDau : '—'}</td>
               </tr>
@@ -843,6 +849,9 @@ export function MarketingProductOverview() {
               </td>
               <td className="py-2.5 text-right">
                 {sortedUnit.reduce((a, r) => a + r.sumDau, 0).toLocaleString('ru-RU')}
+              </td>
+              <td className="py-2.5 text-right">
+                {sortedUnit.reduce((a, r) => a + r.maxDau, 0).toLocaleString('ru-RU')}
               </td>
               <td className="py-2.5 text-right">
                 {sortedUnit.length > 0
