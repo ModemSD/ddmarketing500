@@ -56,6 +56,8 @@ export function MarketingProductOverview() {
   const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
+  const [dynMetric, setDynMetric] = useState<'spend' | 'new_users'>('spend');
+  const [hiddenDynProjects, setHiddenDynProjects] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -126,21 +128,47 @@ export function MarketingProductOverview() {
     };
   });
 
-  // 3. Динамика по дням: Расход vs Новые юзеры
-  const dailyMap: Record<string, { date: string; spend: number; newUsers: number }> = {};
-  for (const r of mktRows) {
-    if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, spend: 0, newUsers: 0 };
-    dailyMap[r.date].spend += Number(r.spend || 0);
-  }
-  for (const s of prodStartups) {
-    for (const d of s.days || []) {
-      if (!dailyMap[d.date]) dailyMap[d.date] = { date: d.date, spend: 0, newUsers: 0 };
-      dailyMap[d.date].newUsers += d.new_users;
+  // 3. Динамика по дням: Расход vs Новые юзеры (составной график по проектам)
+  const DYN_PALETTE = [
+    '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4',
+    '#8b5cf6', '#f97316', '#14b8a6', '#ef4444', '#3b82f6',
+    '#84cc16', '#a855f7', '#eab308', '#0ea5e9', '#d946ef',
+  ];
+  const dynProjects = prodStartups.map((s, idx) => ({
+    id: s.id,
+    name: s.name,
+    color: DYN_PALETTE[idx % DYN_PALETTE.length],
+  }));
+
+  const dailyMap: Record<
+    string,
+    { date: string; total: number; byProject: { id: string; name: string; color: string; val: number }[] }
+  > = {};
+
+  for (const proj of dynProjects) {
+    if (hiddenDynProjects[proj.id]) continue;
+    if (dynMetric === 'spend') {
+      for (const r of mktRows.filter((m) => m.startup_id === proj.id)) {
+        const sp = Number(r.spend || 0);
+        if (sp <= 0) continue;
+        if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, total: 0, byProject: [] };
+        dailyMap[r.date].total += sp;
+        const existing = dailyMap[r.date].byProject.find((p) => p.id === proj.id);
+        if (existing) existing.val += sp;
+        else dailyMap[r.date].byProject.push({ id: proj.id, name: proj.name, color: proj.color, val: sp });
+      }
+    } else {
+      const s = prodStartups.find((st) => st.id === proj.id);
+      for (const d of s?.days || []) {
+        if (d.new_users <= 0) continue;
+        if (!dailyMap[d.date]) dailyMap[d.date] = { date: d.date, total: 0, byProject: [] };
+        dailyMap[d.date].total += d.new_users;
+        dailyMap[d.date].byProject.push({ id: proj.id, name: proj.name, color: proj.color, val: d.new_users });
+      }
     }
   }
   const dailySeries = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
-  const maxSpendDay = Math.max(1, ...dailySeries.map((d) => d.spend));
-  const maxNewDay = Math.max(1, ...dailySeries.map((d) => d.newUsers));
+  const maxDynVal = Math.max(1, ...dailySeries.map((d) => d.total));
 
   // 4 & 5. Unit-экономика по каждому проекту
   const unitRows = prodStartups.map((s) => {
@@ -380,40 +408,110 @@ export function MarketingProductOverview() {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               Динамика: Расход (₽) vs Новые юзеры
-              <InfoTip text="Синие столбцы — суммарный рекламный расход за день по всем каналам. Зелёные столбцы — новые регистрации (New Users) в продуктах за этот же день." />
+              <InfoTip text="Составной график по дням с разбивкой по проектам. Переключайте метрику (Расход / Новые юзеры) и фильтруйте проекты в легенде ниже." />
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> Расход
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> New Users
-              </span>
+            <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setDynMetric('spend')}
+                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                  dynMetric === 'spend' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Расход (₽)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDynMetric('new_users')}
+                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
+                  dynMetric === 'new_users' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Новые юзеры
+              </button>
             </div>
           </div>
-          <div className="flex h-40 items-end gap-1.5 pt-4">
-            {dailySeries.map((d) => (
-              <div key={d.date} className="group relative flex h-full flex-1 flex-col items-center justify-end">
-                <div className="pointer-events-none absolute -top-2 z-20 hidden -translate-y-full rounded bg-slate-900 px-2 py-1 text-[10px] text-white whitespace-nowrap group-hover:block">
-                  {d.date}: {Math.round(d.spend).toLocaleString('ru-RU')} ₽ · {d.newUsers} юзеров
-                </div>
-                <div className="flex h-full w-full items-end gap-0.5">
+          <div className="flex h-44 items-end gap-1.5 pt-4">
+            {dailySeries.map((d) => {
+              const heightPct = Math.max(4, Math.round((d.total / maxDynVal) * 100));
+              const top3 = [...d.byProject].sort((a, b) => b.val - a.val).slice(0, 3);
+              return (
+                <div key={d.date} className="group relative flex h-full flex-1 flex-col items-center justify-end">
+                  <div className="pointer-events-none absolute -top-2 z-20 hidden -translate-y-full rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] text-white shadow-lg whitespace-nowrap group-hover:block">
+                    <div className="font-semibold">
+                      {d.date}: {Math.round(d.total).toLocaleString('ru-RU')} {dynMetric === 'spend' ? '₽' : 'юзеров'}
+                    </div>
+                    {top3.map((p) => (
+                      <div key={p.id} className="flex items-center gap-1.5 text-slate-300">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: p.color }} />
+                        {p.name}: {Math.round(p.val).toLocaleString('ru-RU')}
+                      </div>
+                    ))}
+                  </div>
                   <div
-                    style={{ height: `${Math.max(3, Math.round((d.spend / maxSpendDay) * 100))}%` }}
-                    className="flex-1 rounded-t bg-indigo-500/85"
-                  />
-                  <div
-                    style={{ height: `${Math.max(3, Math.round((d.newUsers / maxNewDay) * 100))}%` }}
-                    className="flex-1 rounded-t bg-emerald-500/85"
-                  />
+                    style={{ height: `${heightPct}%` }}
+                    className="flex w-full flex-col-reverse overflow-hidden rounded-t transition-all duration-300"
+                  >
+                    {d.byProject.map((p) => (
+                      <div
+                        key={p.id}
+                        style={{ height: `${(p.val / d.total) * 100}%`, backgroundColor: p.color }}
+                        className="w-full"
+                      />
+                    ))}
+                  </div>
+                  <span className="mt-1 text-[10px] text-slate-400">{d.date.slice(5)}</span>
                 </div>
-                <span className="mt-1 text-[10px] text-slate-400">{d.date.slice(5)}</span>
+              );
+            })}
+          </div>
+          {dynProjects.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Проекты (кликните, чтобы скрыть/показать):</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setHiddenDynProjects({})} className="text-indigo-600 hover:underline">
+                    Включить все
+                  </button>
+                  <button
+                    onClick={() => {
+                      const all: Record<string, boolean> = {};
+                      dynProjects.forEach((p) => (all[p.id] = true));
+                      setHiddenDynProjects(all);
+                    }}
+                    className="text-slate-500 hover:underline"
+                  >
+                    Скрыть все
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap gap-1.5">
+                {dynProjects.map((p) => {
+                  const isHidden = Boolean(hiddenDynProjects[p.id]);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setHiddenDynProjects((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition-all ${
+                        isHidden
+                          ? 'border-slate-200 bg-slate-50 text-slate-400 line-through'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: isHidden ? '#cbd5e1' : p.color }}
+                      />
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
