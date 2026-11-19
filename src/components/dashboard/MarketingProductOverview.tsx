@@ -115,6 +115,9 @@ export function MarketingProductOverview() {
     const conv = rows.reduce((a, r) => a + (r.conversions || 0), 0);
     const inst = rows.reduce((a, r) => a + (r.installs || 0), 0);
     const botStarts = rows.reduce((a, r) => a + (r.bot_starts || 0), 0);
+    const spendWithConv = rows.filter((r) => (r.conversions || 0) > 0).reduce((a, r) => a + Number(r.spend || 0), 0);
+    const spendWithInstalls = rows.filter((r) => (r.installs || 0) > 0).reduce((a, r) => a + Number(r.spend || 0), 0);
+    const spendWithBotStarts = rows.filter((r) => (r.bot_starts || 0) > 0).reduce((a, r) => a + Number(r.spend || 0), 0);
     return {
       source: ch,
       label: channelLabels[ch],
@@ -123,11 +126,11 @@ export function MarketingProductOverview() {
       clicks,
       cpc: clicks > 0 ? (spend / clicks).toFixed(2) : '0',
       conv,
-      cpa: conv > 0 ? Math.round(spend / conv) : 0,
+      cpa: conv > 0 ? Math.round(spendWithConv / conv) : 0,
       inst,
-      cpi: inst > 0 ? Math.round(spend / inst) : 0,
+      cpi: inst > 0 ? Math.round(spendWithInstalls / inst) : 0,
       botStarts,
-      cpaTg: botStarts > 0 ? Math.round(spend / botStarts) : 0,
+      cpaTg: botStarts > 0 ? Math.round(spendWithBotStarts / botStarts) : 0,
     };
   });
 
