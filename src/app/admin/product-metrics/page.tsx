@@ -43,7 +43,7 @@ export default function ProductMetricsPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<
-    'id' | 'days' | 'dau' | 'llm' | 'tools' | 'tool_calls' | 'new_users'
+    'id' | 'days' | 'dau' | 'llm' | 'tools' | 'tool_calls' | 'new_users' | 'total_users'
   >('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [banner, setBanner] = useState<{
@@ -158,6 +158,8 @@ export default function ProductMetricsPage() {
       if (sortBy === 'tools') return s.days.reduce((acc, d) => acc + d.tool_requests, 0);
       if (sortBy === 'tool_calls')
         return s.days.reduce((acc, d) => acc + d.llm_requests + d.tool_requests, 0);
+      if (sortBy === 'total_users')
+        return s.days.length > 0 ? [...s.days].sort((x, y) => y.date.localeCompare(x.date))[0].total_users : 0;
       return s.days.reduce((acc, d) => acc + d.new_users, 0);
     };
     const va = getVal(a);
@@ -376,12 +378,18 @@ export default function ProductMetricsPage() {
                   >
                     Новые юзеры {sortBy === 'new_users' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
+                  <th
+                    onClick={() => handleSort('total_users')}
+                    className="cursor-pointer px-4 py-3 text-right hover:text-slate-900"
+                  >
+                    Total Users {sortBy === 'total_users' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                    <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                       Загрузка...
                     </td>
                   </tr>
@@ -394,6 +402,9 @@ export default function ProductMetricsPage() {
                     const sumTools = s.days.reduce((acc, d) => acc + d.tool_requests, 0);
                     const sumToolCalls = sumLlm + sumTools;
                     const sumNew = s.days.reduce((acc, d) => acc + d.new_users, 0);
+                    const totalUsers = s.days.length > 0
+                      ? [...s.days].sort((a, b) => b.date.localeCompare(a.date))[0].total_users
+                      : 0;
 
                     return (
                       <React.Fragment key={s.id}>
@@ -445,11 +456,12 @@ export default function ProductMetricsPage() {
                             {sumToolCalls.toLocaleString('ru-RU')}
                           </td>
                           <td className="px-4 py-3 text-right font-mono">{sumNew.toLocaleString('ru-RU')}</td>
+                          <td className="px-4 py-3 text-right font-mono">{totalUsers.toLocaleString('ru-RU')}</td>
                         </tr>
 
                         {isOpen && (
                           <tr className="bg-slate-50/70">
-                            <td colSpan={9} className="px-8 py-3">
+                            <td colSpan={10} className="px-8 py-3">
                               {s.days.length === 0 ? (
                                 <div className="py-2 text-xs text-slate-500">
                                   Нет данных за выбранный период.
