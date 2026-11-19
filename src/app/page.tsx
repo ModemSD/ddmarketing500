@@ -285,10 +285,16 @@ export default function AdminDashboard() {
                         const roleData = await roleRes.json();
                         setUserRole(roleData.role || "viewer");
                         setAuthStatus("authenticated");
+                        return;
                     }
                 }
+                if (!savedPass) {
+                    setAuthStatus("unauthenticated");
+                }
             })
-            .catch(() => { });
+            .catch(() => {
+                if (!savedPass) setAuthStatus("unauthenticated");
+            });
         if (savedSheetUrl) setSheetUrl(savedSheetUrl);
         if (savedTemplate) setSheetTemplate(savedTemplate);
         if (savedSentHistory) {
