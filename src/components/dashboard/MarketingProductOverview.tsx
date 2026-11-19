@@ -59,6 +59,7 @@ export function MarketingProductOverview() {
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format'>('domain');
   const [expandedTax, setExpandedTax] = useState<Record<string, boolean>>({});
+  const [detailStartup, setDetailStartup] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -702,7 +703,11 @@ export function MarketingProductOverview() {
                               </thead>
                               <tbody className="divide-y divide-slate-200/60 font-mono">
                                 {sortedItems.map((item) => (
-                                  <tr key={item.id}>
+                                  <tr
+                                    key={item.id}
+                                    onClick={() => setDetailStartup({ id: item.id, name: item.name })}
+                                    className="cursor-pointer hover:bg-indigo-50/50"
+                                  >
                                     <td className="py-1 font-sans text-slate-800">
                                       <span className="font-medium">{item.name}</span>{' '}
                                       <span className="font-mono text-slate-400">{item.id}</span>
@@ -761,7 +766,11 @@ export function MarketingProductOverview() {
           </thead>
           <tbody className="divide-y divide-slate-100 font-mono">
             {sortedUnit.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50/70">
+              <tr
+                key={r.id}
+                onClick={() => setDetailStartup({ id: r.id, name: r.name })}
+                className="cursor-pointer hover:bg-indigo-50/50"
+              >
                 <td className="py-2 font-sans">
                   <span className="font-medium text-slate-900">{r.name}</span>
                   <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
@@ -804,6 +813,88 @@ export function MarketingProductOverview() {
           </tfoot>
         </table>
       </div>
+
+      {detailStartup && (() => {
+        const pObj = prodStartups.find((s) => s.id === detailStartup.id);
+        const mForS = mktRows.filter((r) => r.startup_id === detailStartup.id);
+        const allDates = Array.from(
+          new Set([
+            ...(pObj?.days || []).map((d) => d.date),
+            ...mForS.map((r) => r.date),
+          ])
+        ).sort((a, b) => b.localeCompare(a));
+
+        return (
+          <div
+            onClick={() => setDetailStartup(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {detailStartup.name} ({detailStartup.id}) — динамика по дням
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Период: {dateFrom} — {dateTo}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailStartup(null)}
+                  className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-2">Дата</th>
+                    <th className="py-2 text-right">Расход (₽)</th>
+                    <th className="py-2 text-right">New Users</th>
+                    <th className="py-2 text-right">CAC (₽)</th>
+                    <th className="py-2 text-right">DAU</th>
+                    <th className="py-2 text-right">Tool Calls</th>
+                    <th className="py-2 text-right">Глубина</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono">
+                  {allDates.map((dt) => {
+                    const p = pObj?.days.find((d) => d.date === dt);
+                    const spend = mForS
+                      .filter((r) => r.date === dt)
+                      .reduce((a, r) => a + Number(r.spend || 0), 0);
+                    const newU = p?.new_users || 0;
+                    const dau = p?.dau || 0;
+                    const tc = (p?.llm_requests || 0) + (p?.tool_requests || 0);
+                    return (
+                      <tr key={dt} className="hover:bg-slate-50">
+                        <td className="py-1.5">{dt}</td>
+                        <td className="py-1.5 text-right font-semibold">
+                          {Math.round(spend).toLocaleString('ru-RU')}
+                        </td>
+                        <td className="py-1.5 text-right">{newU}</td>
+                        <td className="py-1.5 text-right text-indigo-600">
+                          {newU > 0 ? Math.round(spend / newU) : '—'}
+                        </td>
+                        <td className="py-1.5 text-right">{dau}</td>
+                        <td className="py-1.5 text-right">{tc.toLocaleString('ru-RU')}</td>
+                        <td className="py-1.5 text-right">
+                          {dau > 0 ? (tc / dau).toFixed(1) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
