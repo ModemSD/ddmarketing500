@@ -773,8 +773,22 @@ export function MarketingProductOverview() {
                 className="cursor-pointer hover:bg-indigo-50/50"
               >
                 <td className="py-2 font-sans">
-                  <span className="font-medium text-slate-900">{r.name}</span>
-                  <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-slate-900">{r.name}</span>
+                    <span className="font-mono text-slate-400">{r.id}</span>
+                    {STARTUP_TAXONOMY[r.id]?.dauDefinition && (
+                      <div
+                        className="group relative inline-flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <HelpCircle className="h-3.5 w-3.5 cursor-help text-slate-400 hover:text-indigo-600" />
+                        <div className="pointer-events-none absolute left-0 top-5 z-30 hidden w-80 rounded-lg bg-slate-900 p-2.5 text-[11px] font-normal leading-relaxed text-white shadow-xl group-hover:block">
+                          <div className="mb-1 font-semibold text-indigo-300">Как считается DAU:</div>
+                          {STARTUP_TAXONOMY[r.id].dauDefinition}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="py-2 text-right font-semibold">{Math.round(r.spend).toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.newUsers.toLocaleString('ru-RU')}</td>
