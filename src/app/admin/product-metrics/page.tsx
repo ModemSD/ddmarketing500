@@ -482,8 +482,8 @@ export default function ProductMetricsPage() {
                                       <th className="py-1.5 text-right">LLM</th>
                                       <th className="py-1.5 text-right">Tools</th>
                                       <th className="py-1.5 text-right">Tool Calls</th>
-                                      <th className="py-1.5 text-right">Total Users</th>
                                       <th className="py-1.5 text-right">New Users</th>
+                                      <th className="py-1.5 text-right">Total Users</th>
                                       <th className="py-1.5 text-right">Final</th>
                                     </tr>
                                   </thead>
@@ -497,8 +497,8 @@ export default function ProductMetricsPage() {
                                         <td className="py-1.5 text-right font-semibold">
                                           {d.llm_requests + d.tool_requests}
                                         </td>
-                                        <td className="py-1.5 text-right">{d.total_users}</td>
                                         <td className="py-1.5 text-right">{d.new_users}</td>
+                                        <td className="py-1.5 text-right">{d.total_users}</td>
                                         <td className="py-1.5 text-right">
                                           {d.is_final ? '✓' : '…'}
                                         </td>
