@@ -295,11 +295,16 @@ export function ProductMetricsOverview({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>DAU за {dateTo}</span>
+            <span>Средний DAU в день</span>
             <Activity className="h-4 w-4 text-indigo-500" />
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-900">
-            {loading ? '...' : lastDayDau.toLocaleString('ru-RU')}
+            {loading
+              ? '...'
+              : (dailySeries.length > 0
+                  ? Math.round(dailySeries.reduce((a, d) => a + d.total, 0) / dailySeries.length)
+                  : 0
+                ).toLocaleString('ru-RU')}
           </div>
           <div className="mt-1 text-xs text-slate-400">
             Макс. в день: {Math.max(0, ...dailySeries.map((d) => d.total)).toLocaleString('ru-RU')}
