@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
                 ReportType: 'ACCOUNT_PERFORMANCE_REPORT',
                 DateRangeType: 'CUSTOM_DATE',
                 Format: 'TSV',
-                IncludeVAT: 'YES',
+                IncludeVAT: 'NO',
               },
             }),
           });
