@@ -118,21 +118,23 @@ export function AppNav({
 
                 {!collapsed && item.id === "dashboard" && (
                   <div className="pl-6 space-y-0.5">
-                    <Link
-                      href="/admin/startups"
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-                        isStartupsPage
-                          ? "bg-indigo-50 text-indigo-700 font-semibold"
-                          : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                      }`}
-                    >
-                      <Database
-                        className={`w-3.5 h-3.5 shrink-0 ${
-                          isStartupsPage ? "text-indigo-600" : "text-slate-400"
+                    {role === "admin" && (
+                      <Link
+                        href="/admin/startups"
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
+                          isStartupsPage
+                            ? "bg-indigo-50 text-indigo-700 font-semibold"
+                            : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
-                      />
-                      <span className="truncate">Стартапы и API</span>
-                    </Link>
+                      >
+                        <Database
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isStartupsPage ? "text-indigo-600" : "text-slate-400"
+                          }`}
+                        />
+                        <span className="truncate">Стартапы и API</span>
+                      </Link>
+                    )}
                     <Link
                       href="/admin/product-metrics"
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
