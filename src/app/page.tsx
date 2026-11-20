@@ -183,7 +183,7 @@ export default function AdminDashboard() {
         URL.revokeObjectURL(url);
     };
     const [loginEmail, setLoginEmail] = useState("");
-    const [userRole, setUserRole] = useState<"admin" | "viewer">("admin");
+    const [userRole, setUserRole] = useState<"admin" | "viewer">("viewer");
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -1801,6 +1801,7 @@ export default function AdminDashboard() {
                 onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
                 onLogout={handleLogout}
                 feedCount={feedMessages.length}
+                role={userRole}
             />
 
             {/* Правая рабочая область */}
