@@ -14,16 +14,35 @@ import {
   updatePollStateFromTelegram,
 } from "@/lib/storage";
 import { getBotToken, TelegramUpdate } from "@/lib/telegram";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
-function checkAuth(req: NextRequest): boolean {
+async function checkAuth(req: NextRequest): Promise<boolean> {
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) return true;
   const headerPass = req.headers.get("x-admin-password") || "";
-  return headerPass === adminPassword;
+  if (headerPass === adminPassword) return true;
+
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+
+  try {
+    const sb = getSupabaseAdmin();
+    const { data: userData } = await sb.auth.getUser(token);
+    if (!userData?.user) return false;
+    const { data: roleRow } = await sb
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    return roleRow?.role === "admin";
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(req: NextRequest) {
-  if (!checkAuth(req)) {
+  if (!(await checkAuth(req))) {
     return NextResponse.json({ ok: false, error: "Неверный пароль администратора" }, { status: 401 });
   }
 

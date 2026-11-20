@@ -649,9 +649,16 @@ export default function AdminDashboard() {
     ): Promise<boolean> {
         setLoadingChats(true);
         try {
-            const res = await fetch("/api/chats", {
-                headers: { "x-admin-password": pass },
-            });
+            const headers: Record<string, string> = { "x-admin-password": pass };
+            try {
+                const { data: sess } = await getSupabaseBrowser().auth.getSession();
+                if (sess.session?.access_token) {
+                    headers["Authorization"] = `Bearer ${sess.session.access_token}`;
+                }
+            } catch {
+                // ignore
+            }
+            const res = await fetch("/api/chats", { headers });
             const data = await res.json();
             if (res.status === 401) {
                 setAuthStatus("unauthenticated");
