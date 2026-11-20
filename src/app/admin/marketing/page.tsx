@@ -24,6 +24,10 @@ interface MarketingRow {
 export default function MarketingPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
+  useEffect(() => {
+    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
+  }, []);
 
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);
@@ -184,6 +188,7 @@ export default function MarketingPage() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         onLogout={() => router.push('/')}
+        role={userRole}
       />
 
       <div className="flex-1 p-6">
@@ -195,7 +200,8 @@ export default function MarketingPage() {
                 Яндекс Директ, Метрика, AppMetrica, VK Ads и TG Ads
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            {userRole === 'admin' && (
+              <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => {
                   setVkRows([]);
@@ -230,7 +236,8 @@ export default function MarketingPage() {
                 )}
                 {syncing ? 'Выгружаем Яндекс...' : 'Выгрузить Яндекс (Директ + Метрика + AppMetrica)'}
               </button>
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

@@ -116,7 +116,7 @@ export function AppNav({
                   )}
                 </button>
 
-                {!collapsed && item.id === "dashboard" && role === "admin" && (
+                {!collapsed && item.id === "dashboard" && (
                   <div className="pl-6 space-y-0.5">
                     <Link
                       href="/admin/startups"
@@ -163,21 +163,23 @@ export function AppNav({
                       />
                       <span className="truncate">Маркетинг</span>
                     </Link>
-                    <Link
-                      href="/admin/logs"
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-                        isLogsPage
-                          ? "bg-indigo-50 text-indigo-700 font-semibold"
-                          : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                      }`}
-                    >
-                      <History
-                        className={`w-3.5 h-3.5 shrink-0 ${
-                          isLogsPage ? "text-indigo-600" : "text-slate-400"
+                    {role === "admin" && (
+                      <Link
+                        href="/admin/logs"
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
+                          isLogsPage
+                            ? "bg-indigo-50 text-indigo-700 font-semibold"
+                            : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         }`}
-                      />
-                      <span className="truncate">Логи</span>
-                    </Link>
+                      >
+                        <History
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isLogsPage ? "text-indigo-600" : "text-slate-400"
+                          }`}
+                        />
+                        <span className="truncate">Логи</span>
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>

@@ -26,6 +26,10 @@ interface StartupMetrics {
 export default function ProductMetricsPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
+  useEffect(() => {
+    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
+  }, []);
 
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);
@@ -226,6 +230,7 @@ export default function ProductMetricsPage() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         onLogout={() => router.push('/')}
+        role={userRole}
       />
 
       <div className="flex-1 p-6">
@@ -245,22 +250,24 @@ export default function ProductMetricsPage() {
                 <Download className="h-4 w-4" />
                 Скачать CSV
               </button>
-              <button
-                onClick={handleSync}
-                disabled={syncing}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
-              >
-                {syncing ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                {syncing
-                  ? 'Загружаем из API...'
-                  : selectedIds.length > 0
-                  ? `Загрузить выбранные (${selectedIds.length})`
-                  : 'Загрузить данные из API'}
-              </button>
+              {userRole === 'admin' && (
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {syncing ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  {syncing
+                    ? 'Загружаем из API...'
+                    : selectedIds.length > 0
+                    ? `Загрузить выбранные (${selectedIds.length})`
+                    : 'Загрузить данные из API'}
+                </button>
+              )}
             </div>
           </div>
 

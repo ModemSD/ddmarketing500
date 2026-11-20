@@ -51,6 +51,10 @@ const SOURCE_LABELS: Record<SourceType, string> = {
 export default function AdminStartupsPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
+  useEffect(() => {
+    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
+  }, []);
   const [startups, setStartups] = useState<Startup[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingAll, setCheckingAll] = useState(false);
@@ -250,6 +254,7 @@ export default function AdminStartupsPage() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         onLogout={() => router.push('/')}
+        role={userRole}
       />
       <div className="flex-1 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -261,7 +266,8 @@ export default function AdminStartupsPage() {
               Управление справочником, привязкой рекламных кабинетов и проверкой эндпоинтов
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          {userRole === 'admin' && (
+            <div className="flex items-center gap-3">
             <button
               onClick={handleCheckAll}
               disabled={checkingAll}
@@ -278,6 +284,7 @@ export default function AdminStartupsPage() {
               Добавить стартап
             </button>
           </div>
+          )}
         </div>
 
         {/* Banner */}
