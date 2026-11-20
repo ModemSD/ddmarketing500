@@ -153,7 +153,7 @@ export default function ProductMetricsPage() {
     const getVal = (s: StartupMetrics) => {
       if (sortBy === 'id') return s.id;
       if (sortBy === 'days') return s.days.length;
-      if (sortBy === 'dau') return s.days.reduce((acc, d) => acc + d.dau, 0);
+      if (sortBy === 'dau') return s.days.length > 0 ? Math.max(...s.days.map((d) => d.dau)) : 0;
       if (sortBy === 'llm') return s.days.reduce((acc, d) => acc + d.llm_requests, 0);
       if (sortBy === 'tools') return s.days.reduce((acc, d) => acc + d.tool_requests, 0);
       if (sortBy === 'tool_calls')
@@ -352,7 +352,7 @@ export default function ProductMetricsPage() {
                     onClick={() => handleSort('dau')}
                     className="cursor-pointer px-4 py-3 text-right hover:text-slate-900"
                   >
-                    Сумма DAU {sortBy === 'dau' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    Макс. DAU {sortBy === 'dau' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
                   <th
                     onClick={() => handleSort('llm')}
@@ -397,7 +397,7 @@ export default function ProductMetricsPage() {
                   sortedStartups.map((s) => {
                     const isOpen = Boolean(expanded[s.id]);
                     const daysCount = s.days.length;
-                    const sumDau = s.days.reduce((acc, d) => acc + d.dau, 0);
+                    const maxDau = s.days.length > 0 ? Math.max(...s.days.map((d) => d.dau)) : 0;
                     const sumLlm = s.days.reduce((acc, d) => acc + d.llm_requests, 0);
                     const sumTools = s.days.reduce((acc, d) => acc + d.tool_requests, 0);
                     const sumToolCalls = sumLlm + sumTools;
@@ -449,7 +449,7 @@ export default function ProductMetricsPage() {
                               {daysCount} / {expectedDays}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono">{sumDau.toLocaleString('ru-RU')}</td>
+                          <td className="px-4 py-3 text-right font-mono">{maxDau.toLocaleString('ru-RU')}</td>
                           <td className="px-4 py-3 text-right font-mono">{sumLlm.toLocaleString('ru-RU')}</td>
                           <td className="px-4 py-3 text-right font-mono">{sumTools.toLocaleString('ru-RU')}</td>
                           <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">

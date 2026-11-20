@@ -302,7 +302,7 @@ export function ProductMetricsOverview({
             {loading ? '...' : lastDayDau.toLocaleString('ru-RU')}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            Сумма за период: {totalDau.toLocaleString('ru-RU')}
+            Макс. в день: {Math.max(0, ...dailySeries.map((d) => d.total)).toLocaleString('ru-RU')}
           </div>
         </div>
 
