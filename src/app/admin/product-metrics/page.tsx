@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { useUserRole } from '@/lib/useUserRole';
 import { Download, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 
 interface DayRow {
@@ -26,10 +27,7 @@ interface StartupMetrics {
 export default function ProductMetricsPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
-  useEffect(() => {
-    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
-  }, []);
+  const userRole = useUserRole();
 
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);

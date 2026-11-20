@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { useUserRole } from '@/lib/useUserRole';
 import { RefreshCw, Download, ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -24,10 +25,7 @@ interface MarketingRow {
 export default function MarketingPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
-  useEffect(() => {
-    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
-  }, []);
+  const userRole = useUserRole();
 
   const getYesterdayMsk = () => {
     const d = new Date(Date.now() + 3 * 3600 * 1000);

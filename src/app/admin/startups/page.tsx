@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { useUserRole } from '@/lib/useUserRole';
 import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 import {
   Plus,
@@ -51,10 +52,7 @@ const SOURCE_LABELS: Record<SourceType, string> = {
 export default function AdminStartupsPage() {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'viewer'>('viewer');
-  useEffect(() => {
-    fetch('/api/auth/role').then((r) => r.json()).then((d) => { if (d?.role) setUserRole(d.role); }).catch(() => {});
-  }, []);
+  const userRole = useUserRole();
   const [startups, setStartups] = useState<Startup[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingAll, setCheckingAll] = useState(false);
