@@ -720,7 +720,12 @@ export function MarketingProductOverview({
                         <td className="py-2 text-right font-semibold text-indigo-600">
                           {t.newUsers > 0 ? Math.round(t.spend / t.newUsers) : '—'}
                         </td>
-                        <td className="py-2 text-right">{t.sumDau.toLocaleString('ru-RU')}</td>
+                        <td className="py-2 text-right">
+                          {(t.items.length > 0
+                            ? Math.round(t.items.reduce((a, it) => a + it.avgDau, 0) / t.items.length)
+                            : 0
+                          ).toLocaleString('ru-RU')}
+                        </td>
                         <td className="py-2 text-right">{t.projects > 0 ? (t.sumDepth / t.projects).toFixed(1) : '—'}</td>
                       </tr>
                       {isOpen && (
