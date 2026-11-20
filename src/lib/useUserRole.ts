@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 export function useUserRole(): 'admin' | 'viewer' {
-  const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
+  const [role, setRole] = useState<'admin' | 'viewer'>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('d500_user_role');
+      if (cached === 'admin' || cached === 'viewer') return cached;
+    }
+    return 'viewer';
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -19,6 +25,7 @@ export function useUserRole(): 'admin' | 'viewer' {
         });
         const json = await res.json();
         if (!cancelled && (json?.role === 'admin' || json?.role === 'viewer')) {
+          sessionStorage.setItem('d500_user_role', json.role);
           setRole(json.role);
         }
       } catch {
