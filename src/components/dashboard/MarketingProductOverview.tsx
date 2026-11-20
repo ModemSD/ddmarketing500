@@ -61,7 +61,7 @@ export function MarketingProductOverview({
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'max_dau' | 'depth' | 'cost_dau'>('spend');
+  const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'avg_dau_7' | 'avg_dau_14' | 'max_dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showAllSpendBars, setShowAllSpendBars] = useState(false);
   const [taxonomyTab, setTaxonomyTab] = useState<'domain' | 'format' | 'hypothesis'>('domain');
@@ -190,6 +190,12 @@ export function MarketingProductOverview({
       cpi: installs > 0 ? Math.round(spend / installs) : 0,
       sumDau,
       avgDau: pDays.length > 0 ? Math.round(sumDau / pDays.length) : 0,
+      avgDau7: sortedDays.slice(0, 7).length > 0
+        ? Math.round(sortedDays.slice(0, 7).reduce((a, d) => a + d.dau, 0) / sortedDays.slice(0, 7).length)
+        : 0,
+      avgDau14: sortedDays.slice(0, 14).length > 0
+        ? Math.round(sortedDays.slice(0, 14).reduce((a, d) => a + d.dau, 0) / sortedDays.slice(0, 14).length)
+        : 0,
       maxDau: pDays.length > 0 ? Math.max(...pDays.map((d) => d.dau)) : 0,
       depth: sumDau > 0 ? Number((sumTc / sumDau).toFixed(1)) : 0,
       costPerDau: sumDau > 0 ? Math.round(spend / sumDau) : 0,
@@ -212,6 +218,8 @@ export function MarketingProductOverview({
         new_users: a.newUsers - b.newUsers,
         total_users: a.totalUsers - b.totalUsers,
         dau: a.avgDau - b.avgDau,
+        avg_dau_7: a.avgDau7 - b.avgDau7,
+        avg_dau_14: a.avgDau14 - b.avgDau14,
         max_dau: a.maxDau - b.maxDau,
         depth: a.depth - b.depth,
         cost_dau: a.costPerDau - b.costPerDau,
@@ -788,6 +796,12 @@ export function MarketingProductOverview({
               <th onClick={() => handleSort('dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Ср. DAU {sortBy === 'dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
+              <th onClick={() => handleSort('avg_dau_7')} className="cursor-pointer py-2 text-right hover:text-slate-900">
+                Ср. DAU 7д {sortBy === 'avg_dau_7' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+              </th>
+              <th onClick={() => handleSort('avg_dau_14')} className="cursor-pointer py-2 text-right hover:text-slate-900">
+                Ср. DAU 14д {sortBy === 'avg_dau_14' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+              </th>
               <th onClick={() => handleSort('max_dau')} className="cursor-pointer py-2 text-right hover:text-slate-900">
                 Макс. DAU {sortBy === 'max_dau' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
               </th>
@@ -837,6 +851,8 @@ export function MarketingProductOverview({
                     )}
                   </div>
                 </td>
+                <td className="py-2 text-right">{r.avgDau7.toLocaleString('ru-RU')}</td>
+                <td className="py-2 text-right">{r.avgDau14.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.maxDau.toLocaleString('ru-RU')}</td>
                 <td className="py-2 text-right">{r.depth}</td>
                 <td className="py-2 text-right">{r.costPerDau > 0 ? r.costPerDau : '—'}</td>
@@ -857,7 +873,13 @@ export function MarketingProductOverview({
                 {totalInstalls > 0 ? Math.round(totalSpend / totalInstalls) : '—'}
               </td>
               <td className="py-2.5 text-right">
-                {sortedUnit.reduce((a, r) => a + r.sumDau, 0).toLocaleString('ru-RU')}
+                {sortedUnit.length > 0 ? Math.round(sortedUnit.reduce((a, r) => a + r.avgDau, 0) / sortedUnit.length).toLocaleString('ru-RU') : '—'}
+              </td>
+              <td className="py-2.5 text-right">
+                {sortedUnit.length > 0 ? Math.round(sortedUnit.reduce((a, r) => a + r.avgDau7, 0) / sortedUnit.length).toLocaleString('ru-RU') : '—'}
+              </td>
+              <td className="py-2.5 text-right">
+                {sortedUnit.length > 0 ? Math.round(sortedUnit.reduce((a, r) => a + r.avgDau14, 0) / sortedUnit.length).toLocaleString('ru-RU') : '—'}
               </td>
               <td className="py-2.5 text-right">
                 {sortedUnit.reduce((a, r) => a + r.maxDau, 0).toLocaleString('ru-RU')}
@@ -919,6 +941,7 @@ export function MarketingProductOverview({
                     <th className="py-2">Дата</th>
                     <th className="py-2 text-right">Расход (₽)</th>
                     <th className="py-2 text-right">New Users</th>
+                    <th className="py-2 text-right">Total Users</th>
                     <th className="py-2 text-right">CAC (₽)</th>
                     <th className="py-2 text-right">DAU</th>
                     <th className="py-2 text-right">Tool Calls</th>
@@ -941,6 +964,7 @@ export function MarketingProductOverview({
                           {Math.round(spend).toLocaleString('ru-RU')}
                         </td>
                         <td className="py-1.5 text-right">{newU}</td>
+                        <td className="py-1.5 text-right">{(p?.total_users || 0).toLocaleString('ru-RU')}</td>
                         <td className="py-1.5 text-right text-indigo-600">
                           {newU > 0 ? Math.round(spend / newU) : '—'}
                         </td>

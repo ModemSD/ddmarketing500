@@ -85,6 +85,7 @@ export function ProductMetricsOverview({
     id: string;
     name: string;
     sumDau: number;
+    maxDau: number;
     avgDau: number;
     sumToolCalls: number;
     depth: number;
@@ -96,6 +97,7 @@ export function ProductMetricsOverview({
     activeWithData++;
 
     const sumDau = s.days.reduce((acc, d) => acc + d.dau, 0);
+    const maxDau = s.days.length > 0 ? Math.max(...s.days.map((d) => d.dau)) : 0;
     const sumToolCalls = s.days.reduce((acc, d) => acc + d.llm_requests + d.tool_requests, 0);
     const sumNew = s.days.reduce((acc, d) => acc + d.new_users, 0);
     const avgDau = Math.round(sumDau / s.days.length);
@@ -133,6 +135,7 @@ export function ProductMetricsOverview({
       id: s.id,
       name: s.name,
       sumDau,
+      maxDau,
       avgDau,
       sumToolCalls,
       depth: sumDau > 0 ? Number((sumToolCalls / sumDau).toFixed(1)) : 0,
@@ -415,7 +418,7 @@ export function ProductMetricsOverview({
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
                   <th className="py-1.5">Проект</th>
-                  <th className="py-1.5 text-right">Сумма DAU</th>
+                  <th className="py-1.5 text-right">Макс. DAU</th>
                   <th className="py-1.5 text-right">Ср. DAU/день</th>
                   <th className="py-1.5 text-right">Tool Calls</th>
                   <th className="py-1.5 text-right">Глубина (TC/DAU)</th>
@@ -440,7 +443,7 @@ export function ProductMetricsOverview({
                         <span className="font-medium text-slate-900">{r.name}</span>
                         <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
                       </td>
-                      <td className="py-1.5 text-right font-mono">{r.sumDau.toLocaleString('ru-RU')}</td>
+                      <td className="py-1.5 text-right font-mono">{r.maxDau.toLocaleString('ru-RU')}</td>
                       <td className="py-1.5 text-right font-mono">{r.avgDau.toLocaleString('ru-RU')}</td>
                       <td className="py-1.5 text-right font-mono">
                         {r.sumToolCalls.toLocaleString('ru-RU')}
@@ -495,7 +498,13 @@ export function ProductMetricsOverview({
               Нет данных (или все проекты отключены в легенде)
             </div>
           ) : (
-            <div className="flex h-48 items-end gap-1.5 pt-4">
+            <div className="flex gap-2 pt-4">
+              <div className="flex h-48 flex-col justify-between pr-1 text-right font-mono text-[10px] text-slate-400">
+                <span>{maxChartVal.toLocaleString('ru-RU')}</span>
+                <span>{Math.round(maxChartVal / 2).toLocaleString('ru-RU')}</span>
+                <span>0</span>
+              </div>
+              <div className="flex h-48 flex-1 items-end gap-1.5 border-b border-l border-slate-200 pl-2">
               {dailySeries.map((d) => {
                 const heightPct = Math.max(4, Math.round((d.displayTotal / maxChartVal) * 100));
                 const top3 = [...d.byProject].sort((a, b) => b.val - a.val).slice(0, 3);
@@ -547,6 +556,7 @@ export function ProductMetricsOverview({
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
 
