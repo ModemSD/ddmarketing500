@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { GET as syncProduct } from '@/app/api/admin/product-metrics/route';
+import { POST as syncYandex } from '@/app/api/admin/yandex-sync/route';
+import { POST as syncTg } from '@/app/api/admin/adstat-sync/route';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -19,29 +22,22 @@ export async function GET(req: NextRequest) {
   const yesterday = getYesterdayMsk();
   const origin = req.nextUrl.origin;
 
-  const [product, yandex, vk, tg] = await Promise.allSettled([
-    fetch(`${origin}/api/admin/product-metrics?date_from=${yesterday}&date_to=${yesterday}`).then((r) => r.json()),
-    fetch(`${origin}/api/admin/yandex-sync`, {
+  const makePostReq = (path: string) =>
+    new NextRequest(`${origin}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date_from: yesterday, date_to: yesterday }),
-    }).then((r) => r.json()),
-    fetch(`${origin}/api/admin/vk-sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: yesterday, date_to: yesterday }),
-    }).then((r) => r.json()),
-    fetch(`${origin}/api/admin/tg-sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: yesterday, date_to: yesterday }),
-    }).then((r) => r.json()),
+    });
+
+  const [product, yandex, tg] = await Promise.allSettled([
+    syncProduct(new NextRequest(`${origin}/api/admin/product-metrics?date_from=${yesterday}&date_to=${yesterday}`)).then((r) => r.json()),
+    syncYandex(makePostReq('/api/admin/yandex-sync')).then((r) => r.json()),
+    syncTg(makePostReq('/api/admin/adstat-sync')).then((r) => r.json()),
   ]);
 
   const results = {
     product: product.status === 'fulfilled' ? product.value : { error: String(product.reason) },
     yandex: yandex.status === 'fulfilled' ? yandex.value : { error: String(yandex.reason) },
-    vk: vk.status === 'fulfilled' ? vk.value : { error: String(vk.reason) },
     tg: tg.status === 'fulfilled' ? tg.value : { error: String(tg.reason) },
   };
 
