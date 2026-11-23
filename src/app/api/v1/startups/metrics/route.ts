@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const [{ data: startups, error: sErr }, { data: days, error: dErr }] = await Promise.all([
     sb.from('startups').select('id, name').eq('is_active', true).order('id'),
     sb
-      .from('product_metrics_daily')
+      .from('daily_product_metrics')
       .select('startup_id, date, dau, llm_requests, tool_requests, total_users')
       .gte('date', dateFrom)
       .lte('date', dateTo)
