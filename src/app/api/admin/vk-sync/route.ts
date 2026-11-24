@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
 
   if (rows.length > 0) {
     const { error } = await sb
-      .from('marketing_metrics')
+      .from('daily_marketing_metrics')
       .upsert(rows, { onConflict: 'startup_id,date,source' });
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
