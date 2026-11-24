@@ -10,6 +10,18 @@ function getYesterdayMsk(): string {
   return d.toISOString().slice(0, 10);
 }
 
+const VK_CABINET_TO_STARTUP: Record<string, string> = {
+  '1092349155': '29507',
+  '1092303191': '29453',
+  '1092251809': '27569',
+  '1092163454': '28554',
+  '1092155366': '29499',
+  '1092155346': '29157',
+  '1092144371': '28431',
+  '1092144354': '30418',
+  '1092137662': '29203',
+};
+
 export async function POST(req: NextRequest) {
   let dateFrom = getYesterdayMsk();
   let dateTo = dateFrom;
@@ -45,19 +57,30 @@ export async function POST(req: NextRequest) {
 
   for (const token of tokens) {
     try {
-      const plansRes = await fetch('https://ads.vk.com/api/v2/ad_plans.json?limit=250', {
+      const userRes = await fetch('https://ads.vk.com/api/v2/user.json', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!plansRes.ok) {
+      if (!userRes.ok) {
         errCabinets++;
         continue;
       }
-      const plansJson = await plansRes.json();
-      const planToStartup: Record<string, string> = {};
-      for (const p of plansJson.items || []) {
-        const m = String(p.name || '').match(/\b(\d{5})\b/);
-        if (m && validIds.has(m[1])) {
-          planToStartup[String(p.id)] = m[1];
+      const userJson = await userRes.json();
+      const cabinetId = String(userJson.id || '');
+      const mappedStartupId = VK_CABINET_TO_STARTUP[cabinetId];
+
+      let planToStartup: Record<string, string> = {};
+      if (!mappedStartupId) {
+        const plansRes = await fetch('https://ads.vk.com/api/v2/ad_plans.json?limit=250', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (plansRes.ok) {
+          const plansJson = await plansRes.json();
+          for (const p of plansJson.items || []) {
+            const m = String(p.name || '').match(/\b(\d{5})\b/);
+            if (m && validIds.has(m[1])) {
+              planToStartup[String(p.id)] = m[1];
+            }
+          }
         }
       }
 
@@ -71,7 +94,7 @@ export async function POST(req: NextRequest) {
       }
       const statsJson = await statsRes.json();
       for (const item of statsJson.items || []) {
-        const sid = planToStartup[String(item.id)];
+        const sid = mappedStartupId || planToStartup[String(item.id)];
         if (!sid) continue;
         for (const row of item.rows || []) {
           const base = row.base || {};
