@@ -34,8 +34,17 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = getSupabaseAdmin();
-  const { data: startups } = await sb.from('startups').select('id').eq('is_active', true);
+  const [{ data: startups }, { data: vkAccounts }] = await Promise.all([
+    sb.from('startups').select('id').eq('is_active', true),
+    sb.from('startup_ad_accounts').select('startup_id, external_account_id').eq('source', 'vk_ads'),
+  ]);
   const validIds = new Set((startups || []).map((s) => s.id));
+  const dbCabinetToStartup: Record<string, string> = {};
+  for (const acc of vkAccounts || []) {
+    if (acc.external_account_id && acc.startup_id) {
+      dbCabinetToStartup[String(acc.external_account_id).trim()] = acc.startup_id;
+    }
+  }
 
   let tokens: string[] = [];
   if (process.env.VK_ADS_TOKENS) {
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
       }
       const userJson = await userRes.json();
       const cabinetId = String(userJson.id || '');
-      const mappedStartupId = VK_CABINET_TO_STARTUP[cabinetId];
+      const mappedStartupId = dbCabinetToStartup[cabinetId] || VK_CABINET_TO_STARTUP[cabinetId];
 
       let planToStartup: Record<string, string> = {};
       if (!mappedStartupId) {
