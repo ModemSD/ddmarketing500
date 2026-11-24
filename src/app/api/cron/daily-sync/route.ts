@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { GET as syncProduct } from '@/app/api/admin/product-metrics/route';
+import { POST as syncProduct } from '@/app/api/admin/product-metrics/route';
 import { POST as syncYandex } from '@/app/api/admin/yandex-sync/route';
 import { POST as syncTg } from '@/app/api/admin/adstat-sync/route';
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     });
 
   const [product, yandex, tg] = await Promise.allSettled([
-    syncProduct(new NextRequest(`${origin}/api/admin/product-metrics?date_from=${yesterday}&date_to=${yesterday}`)).then((r) => r.json()),
+    syncProduct(makePostReq('/api/admin/product-metrics')).then((r) => r.json()),
     syncYandex(makePostReq('/api/admin/yandex-sync')).then((r) => r.json()),
     syncTg(makePostReq('/api/admin/adstat-sync')).then((r) => r.json()),
   ]);
