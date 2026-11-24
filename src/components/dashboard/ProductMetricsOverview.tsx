@@ -90,6 +90,9 @@ export function ProductMetricsOverview({
     sumToolCalls: number;
     depth: number;
     sumNew: number;
+    bestStreak1000: number;
+    currentStreak1000: number;
+    daysOver1000: number;
   }[] = [];
 
   for (const s of startups) {
@@ -131,6 +134,20 @@ export function ProductMetricsOverview({
       }
     }
 
+    const sortedAsc = [...s.days].sort((a, b) => a.date.localeCompare(b.date));
+    let curStreak = 0;
+    let bestStreak = 0;
+    let daysOver1000 = 0;
+    for (const d of sortedAsc) {
+      if (d.dau >= 1000) {
+        daysOver1000 += 1;
+        curStreak += 1;
+        if (curStreak > bestStreak) bestStreak = curStreak;
+      } else {
+        curStreak = 0;
+      }
+    }
+
     ranked.push({
       id: s.id,
       name: s.name,
@@ -140,6 +157,9 @@ export function ProductMetricsOverview({
       sumToolCalls,
       depth: sumDau > 0 ? Number((sumToolCalls / sumDau).toFixed(1)) : 0,
       sumNew,
+      bestStreak1000: Math.min(14, bestStreak),
+      currentStreak1000: curStreak,
+      daysOver1000,
     });
   }
 
@@ -640,6 +660,85 @@ export function ProductMetricsOverview({
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Пробили 1000 DAU + Зачётная серия */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Пробили 1 000 DAU ({ranked.filter((r) => r.maxDau >= 1000).length})
+            </h3>
+            <span className="text-[11px] text-slate-400">Макс. DAU за период</span>
+          </div>
+          {ranked.filter((r) => r.maxDau >= 1000).length === 0 ? (
+            <div className="py-4 text-xs text-slate-400">Пока ни один проект не пробил 1 000 DAU за период.</div>
+          ) : (
+            <div className="space-y-2">
+              {ranked
+                .filter((r) => r.maxDau >= 1000)
+                .sort((a, b) => b.maxDau - a.maxDau)
+                .map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
+                  >
+                    <div>
+                      <span className="font-medium text-slate-900">{r.name}</span>
+                      <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                    </div>
+                    <div className="flex items-center gap-3 font-mono">
+                      <span className="text-[11px] text-slate-500">{r.daysOver1000} дн. ≥1000</span>
+                      <span className="font-semibold text-indigo-600">{r.maxDau.toLocaleString('ru-RU')}</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Зачётная серия (DAU ≥ 1 000)</h3>
+            <span className="text-[11px] text-slate-400">Лучшая серия подряд (0/14 → 14/14)</span>
+          </div>
+          {ranked.filter((r) => r.bestStreak1000 > 0).length === 0 ? (
+            <div className="py-4 text-xs text-slate-400">Пока нет проектов с серией ≥ 1 дня.</div>
+          ) : (
+            <div className="space-y-2.5">
+              {ranked
+                .filter((r) => r.bestStreak1000 > 0)
+                .sort((a, b) => b.bestStreak1000 - a.bestStreak1000 || b.currentStreak1000 - a.currentStreak1000)
+                .map((r) => {
+                  const pct = Math.round((r.bestStreak1000 / 14) * 100);
+                  return (
+                    <div key={r.id} className="space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium text-slate-900">{r.name}</span>
+                          <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono">
+                          {r.currentStreak1000 > 0 && (
+                            <span className="text-[10px] text-emerald-600">сейчас {r.currentStreak1000}</span>
+                          )}
+                          <span className="font-semibold text-slate-900">{r.bestStreak1000}/14</span>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className={`h-full rounded-full transition-all ${
+                            r.bestStreak1000 >= 14 ? 'bg-emerald-500' : 'bg-indigo-500'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
