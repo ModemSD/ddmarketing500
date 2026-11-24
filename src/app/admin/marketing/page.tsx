@@ -48,6 +48,7 @@ export default function MarketingPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncingTg, setSyncingTg] = useState(false);
+  const [syncingVk, setSyncingVk] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [expandedChannels, setExpandedChannels] = useState<Record<string, boolean>>({});
   const [goalModal, setGoalModal] = useState<{ startupId: string; name: string; goal: string } | null>(null);
@@ -209,6 +210,42 @@ export default function MarketingPage() {
               >
                 <Upload className="h-4 w-4" />
                 Загрузить VK Ads (CSV)
+              </button>
+              <button
+                onClick={async () => {
+                  setSyncingVk(true);
+                  setBanner(null);
+                  try {
+                    const res = await fetch('/api/admin/vk-sync', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                      setBanner({
+                        type: 'ok',
+                        text: `VK Ads: кабинетов ${data.cabinets_ok} (ошибок ${data.cabinets_err}), обновлено строк: ${data.upserted_rows}`,
+                      });
+                      await loadData();
+                    } else {
+                      setBanner({ type: 'error', text: data.error || 'Ошибка выгрузки VK Ads' });
+                    }
+                  } catch {
+                    setBanner({ type: 'error', text: 'Ошибка сети при выгрузке VK Ads' });
+                  } finally {
+                    setSyncingVk(false);
+                  }
+                }}
+                disabled={syncingVk}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              >
+                {syncingVk ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {syncingVk ? 'Выгружаем VK Ads...' : 'Выгрузить VK Ads (API)'}
               </button>
               <button
                 onClick={handleAdstatSync}
