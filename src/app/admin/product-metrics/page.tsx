@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
 import { useUserRole } from '@/lib/useUserRole';
 import { Download, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { formatDateRu } from '@/lib/dateFormat';
 
 interface DayRow {
   date: string;
@@ -488,7 +489,7 @@ export default function ProductMetricsPage() {
                                   <tbody className="divide-y divide-slate-200/70 font-mono">
                                     {s.days.map((d) => (
                                       <tr key={d.date}>
-                                        <td className="py-1.5">{d.date}</td>
+                                        <td className="py-1.5">{formatDateRu(d.date)}</td>
                                         <td className="py-1.5 text-right">{d.dau}</td>
                                         <td className="py-1.5 text-right">{d.llm_requests}</td>
                                         <td className="py-1.5 text-right">{d.tool_requests}</td>

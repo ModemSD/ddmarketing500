@@ -56,6 +56,11 @@ export function AppNav({
   role = "admin",
 }: AppNavProps) {
   const pathname = usePathname();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+  const effectiveRole = mounted ? role : "admin";
   const isStartupsPage = pathname?.startsWith("/admin/startups");
   const isProductMetricsPage = pathname?.startsWith("/admin/product-metrics");
   const isMarketingPage = pathname?.startsWith("/admin/marketing");
@@ -78,7 +83,7 @@ export function AppNav({
 
         {/* Меню разделов: только Dashboard и Telegram Bot */}
         <nav className="p-3 space-y-1">
-          {SIDEBAR_ITEMS.filter((item) => role === "admin" || item.id === "dashboard").map((item) => {
+          {SIDEBAR_ITEMS.filter((item) => effectiveRole === "admin" || item.id === "dashboard").map((item) => {
             const Icon = item.icon;
             const isActive = !isSubPage && activeSection === item.id;
 
@@ -118,7 +123,7 @@ export function AppNav({
 
                 {!collapsed && item.id === "dashboard" && (
                   <div className="pl-6 space-y-0.5">
-                    {role === "admin" && (
+                    {effectiveRole === "admin" && (
                       <Link
                         href="/admin/startups"
                         className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${
@@ -165,7 +170,7 @@ export function AppNav({
                       />
                       <span className="truncate">Маркетинг</span>
                     </Link>
-                    {role === "admin" && (
+                    {effectiveRole === "admin" && (
                       <Link
                         href="/admin/logs"
                         className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] transition-colors ${

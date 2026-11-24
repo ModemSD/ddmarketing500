@@ -8,6 +8,7 @@ import { RefreshCw, Download, ChevronDown, ChevronRight, Upload } from 'lucide-r
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
+import { formatDateRu } from '@/lib/dateFormat';
 
 interface MarketingRow {
   startup_id: string;
@@ -541,7 +542,7 @@ export default function MarketingPage() {
                                                 {chRows.map((d) =>
                                                   src === 'appmetrica' ? (
                                                     <tr key={d.date}>
-                                                      <td className="py-1">{d.date}</td>
+                                                      <td className="py-1">{formatDateRu(d.date)}</td>
                                                       <td className="py-1 text-right">{d.sessions || 0}</td>
                                                       <td className="py-1 text-right">{d.installs || 0}</td>
                                                       <td className="py-1 text-right font-semibold">
@@ -550,7 +551,7 @@ export default function MarketingPage() {
                                                     </tr>
                                                   ) : (
                                                     <tr key={d.date}>
-                                                      <td className="py-1">{d.date}</td>
+                                                      <td className="py-1">{formatDateRu(d.date)}</td>
                                                       <td className="py-1 text-right">
                                                         {Number(d.spend).toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                                                       </td>

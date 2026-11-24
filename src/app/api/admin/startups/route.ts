@@ -60,6 +60,10 @@ export async function POST(req: NextRequest) {
     const apiUrl = body.api_url ? String(body.api_url).trim() : null;
     const plainToken = body.api_token ? String(body.api_token).trim() : null;
 
+    const solutionUrls = Array.isArray(body.solution_urls)
+      ? body.solution_urls.map((u: unknown) => String(u || '').trim()).filter(Boolean)
+      : undefined;
+
     const upsertData: Record<string, unknown> = {
       id,
       name,
@@ -68,6 +72,10 @@ export async function POST(req: NextRequest) {
       is_active: body.is_active !== undefined ? Boolean(body.is_active) : true,
       updated_at: new Date().toISOString(),
     };
+
+    if (solutionUrls !== undefined) {
+      upsertData.solution_urls = solutionUrls;
+    }
 
     if (plainToken) {
       upsertData.api_token_encrypted = encryptToken(plainToken);

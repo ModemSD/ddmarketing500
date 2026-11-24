@@ -4,15 +4,13 @@ import { useEffect, useState } from 'react';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
 
 export function useUserRole(): 'admin' | 'viewer' {
-  const [role, setRole] = useState<'admin' | 'viewer'>(() => {
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('d500_user_role');
-      if (cached === 'admin' || cached === 'viewer') return cached;
-    }
-    return 'viewer';
-  });
+  const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
 
   useEffect(() => {
+    const cached = sessionStorage.getItem('d500_user_role');
+    if (cached === 'admin' || cached === 'viewer') {
+      setRole(cached);
+    }
     let cancelled = false;
     (async () => {
       try {

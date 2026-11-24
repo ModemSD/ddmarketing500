@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { HelpCircle, ArrowRight, ChevronDown, ChevronRight } from 'lucide-react';
+import { formatDateRu, formatShortDateRu } from '@/lib/dateFormat';
+import { HelpCircle, ArrowRight, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { STARTUP_TAXONOMY } from '@/lib/startup-taxonomy';
 
 interface ProductDay {
@@ -60,6 +61,8 @@ export function MarketingProductOverview({
   const dateTo = propDateTo || getYesterdayMsk();
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
+  const [solutionUrlsMap, setSolutionUrlsMap] = useState<Record<string, string[]>>({});
+  const [openUrlMenuId, setOpenUrlMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'avg_dau_7' | 'avg_dau_14' | 'max_dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -78,11 +81,21 @@ export function MarketingProductOverview({
       fetch(`/api/admin/marketing-metrics?date_from=${dateFrom}&date_to=${dateTo}`, { cache: 'no-store' }).then((r) =>
         r.json()
       ),
+      fetch('/api/admin/startups', { cache: 'no-store' })
+        .then((r) => r.json())
+        .catch(() => ({ startups: [] })),
     ])
-      .then(([pData, mData]) => {
+      .then(([pData, mData, sData]) => {
         if (cancelled) return;
         setProdStartups(pData.startups || []);
         setMktRows(mData.metrics || []);
+        const urlMap: Record<string, string[]> = {};
+        for (const s of sData?.startups || []) {
+          if (Array.isArray(s.solution_urls) && s.solution_urls.length > 0) {
+            urlMap[s.id] = s.solution_urls;
+          }
+        }
+        setSolutionUrlsMap(urlMap);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -416,7 +429,7 @@ export function MarketingProductOverview({
             {dailySeries.map((d) => (
               <div key={d.date} className="group relative flex h-full flex-1 flex-col items-center justify-end">
                 <div className="pointer-events-none absolute -top-2 z-20 hidden -translate-y-full rounded bg-slate-900 px-2 py-1 text-[10px] text-white whitespace-nowrap group-hover:block">
-                  {d.date}: {Math.round(d.spend).toLocaleString('ru-RU')} ₽ · {d.newUsers} юзеров
+                  {formatDateRu(d.date)}: {Math.round(d.spend).toLocaleString('ru-RU')} ₽ · {d.newUsers} юзеров
                 </div>
                 <div className="flex h-full w-full items-end gap-0.5">
                   <div
@@ -428,7 +441,7 @@ export function MarketingProductOverview({
                     className="flex-1 rounded-t bg-emerald-500/85"
                   />
                 </div>
-                <span className="mt-1 text-[10px] text-slate-400">{d.date.slice(5)}</span>
+                <span className="mt-1 text-[10px] text-slate-400">{formatShortDateRu(d.date)}</span>
               </div>
             ))}
           </div>
@@ -826,8 +839,45 @@ export function MarketingProductOverview({
                 className="cursor-pointer hover:bg-indigo-50/50"
               >
                 <td className="py-2 font-sans">
-                  <div className="flex items-center gap-1.5">
+                  <div className="relative flex items-center gap-1.5">
                     <span className="font-medium text-slate-900">{r.name}</span>
+                    {(() => {
+                      const urls = solutionUrlsMap[r.id] || [];
+                      if (urls.length === 0) return null;
+                      const isOpen = openUrlMenuId === r.id;
+                      return (
+                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenUrlMenuId(isOpen ? null : r.id)}
+                            title="Ссылки на решение"
+                            className="rounded p-0.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
+                          {isOpen && (
+                            <div className="absolute left-0 top-6 z-30 min-w-[200px] rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                Выберите решение
+                              </div>
+                              {urls.map((u, idx) => (
+                                <a
+                                  key={idx}
+                                  href={u}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => setOpenUrlMenuId(null)}
+                                  className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                >
+                                  <ExternalLink className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{u.replace(/^https?:\/\//, '')}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <span className="font-mono text-slate-400">{r.id}</span>
                   </div>
                 </td>
@@ -929,7 +979,7 @@ export function MarketingProductOverview({
                     {detailStartup.name} ({detailStartup.id}) — динамика по дням
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Период: {dateFrom} — {dateTo}
+                    Период: {formatDateRu(dateFrom)} — {formatDateRu(dateTo)}
                   </p>
                 </div>
                 <button
@@ -964,7 +1014,7 @@ export function MarketingProductOverview({
                     const tc = (p?.llm_requests || 0) + (p?.tool_requests || 0);
                     return (
                       <tr key={dt} className="hover:bg-slate-50">
-                        <td className="py-1.5">{dt}</td>
+                        <td className="py-1.5">{formatDateRu(dt)}</td>
                         <td className="py-1.5 text-right font-semibold">
                           {Math.round(spend).toLocaleString('ru-RU')}
                         </td>

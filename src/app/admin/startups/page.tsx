@@ -16,6 +16,7 @@ import {
   X,
   Search,
   Activity,
+  ExternalLink,
 } from 'lucide-react';
 
 type SourceType = 'yandex_direct' | 'vk_ads' | 'tg_ads' | 'yandex_metrika' | 'appmetrica';
@@ -38,6 +39,7 @@ interface Startup {
   last_error: string | null;
   marketing_start_date: string | null;
   is_active: boolean;
+  solution_urls?: string[];
   ad_accounts: AdAccount[];
 }
 
@@ -70,6 +72,7 @@ export default function AdminStartupsPage() {
   const [formApiUrl, setFormApiUrl] = useState('');
   const [formApiToken, setFormApiToken] = useState('');
   const [formStartDate, setFormStartDate] = useState('');
+  const [formSolutionUrls, setFormSolutionUrls] = useState<string[]>([]);
   const [formAccounts, setFormAccounts] = useState<AdAccount[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -143,6 +146,7 @@ export default function AdminStartupsPage() {
     setFormApiUrl('');
     setFormApiToken('');
     setFormStartDate('');
+    setFormSolutionUrls([]);
     setFormAccounts([]);
     setIsModalOpen(true);
   };
@@ -154,6 +158,7 @@ export default function AdminStartupsPage() {
     setFormApiUrl(s.api_url || '');
     setFormApiToken('');
     setFormStartDate(s.marketing_start_date || '');
+    setFormSolutionUrls(s.solution_urls || []);
     setFormAccounts(s.ad_accounts || []);
     setIsModalOpen(true);
   };
@@ -172,6 +177,7 @@ export default function AdminStartupsPage() {
           api_url: formApiUrl || null,
           api_token: formApiToken || null,
           marketing_start_date: formStartDate || null,
+          solution_urls: formSolutionUrls.map((u) => u.trim()).filter(Boolean),
           ad_accounts: formAccounts,
         }),
       });
@@ -366,6 +372,25 @@ export default function AdminStartupsPage() {
                           ))}
                         </div>
                       )}
+                      {s.solution_urls && s.solution_urls.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {s.solution_urls.map((url, idx) => (
+                            <a
+                              key={idx}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-100"
+                              title={url}
+                            >
+                              <ExternalLink className="h-2.5 w-2.5" />
+                              <span className="max-w-[160px] truncate">
+                                {url.replace(/^https?:\/\//, '')}
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {s.api_url ? (
@@ -512,6 +537,52 @@ export default function AdminStartupsPage() {
                   placeholder="https://enot.ai/api/v1/metrics/daily"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm"
                 />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-700">
+                    URL на решение (можно несколько)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFormSolutionUrls((prev) => [...prev, ''])}
+                    className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-200"
+                  >
+                    <Plus className="h-3 w-3" /> Добавить ссылку
+                  </button>
+                </div>
+                {formSolutionUrls.length === 0 ? (
+                  <div className="text-xs text-slate-400">Ссылки на решение не добавлены</div>
+                ) : (
+                  <div className="space-y-2">
+                    {formSolutionUrls.map((url, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) =>
+                            setFormSolutionUrls((prev) =>
+                              prev.map((item, i) => (i === idx ? e.target.value : item))
+                            )
+                          }
+                          placeholder="https://example.com или https://t.me/bot"
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormSolutionUrls((prev) => prev.filter((_, i) => i !== idx))
+                          }
+                          title="Удалить ссылку"
+                          className="rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

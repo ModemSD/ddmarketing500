@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { StartupAnalyticsRecord } from "./types";
+import { formatShortDateRu } from "@/lib/dateFormat";
 
 interface MrrTrendChartProps {
   startups: StartupAnalyticsRecord[];
@@ -94,7 +95,7 @@ export function MrrTrendChart({ startups }: MrrTrendChartProps) {
         <div className="h-44 flex items-end gap-2 pt-6 px-1 border-b border-slate-100">
           {series.map((pt) => {
             const heightPct = Math.max(8, Math.round((pt.value / maxVal) * 100));
-            const shortDate = pt.date.slice(5).replace("-", ".");
+            const shortDate = formatShortDateRu(pt.date);
             return (
               <div
                 key={pt.date}

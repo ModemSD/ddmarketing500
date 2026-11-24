@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
-import { Activity, Cpu, UserPlus, AlertTriangle, TrendingUp } from 'lucide-react';
+import { formatDateRu, formatShortDateRu } from '@/lib/dateFormat';
+import { Download, Users, Wallet, UserPlus, AlertTriangle, TrendingUp, Pencil, Check, X } from 'lucide-react';
 
 interface DayRow {
   date: string;
@@ -49,19 +49,64 @@ export function ProductMetricsOverview({
   const [hiddenProjects, setHiddenProjects] = useState<Record<string, boolean>>({});
   const [topTab, setTopTab] = useState<'dau' | 'tool_calls' | 'depth' | 'new_users'>('dau');
   const [startups, setStartups] = useState<StartupMetrics[]>([]);
+  const [totalSpend, setTotalSpend] = useState(0);
+  const [totalBudgetRub, setTotalBudgetRub] = useState(0);
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const [savingBudget, setSavingBudget] = useState(false);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleSaveBudget = async () => {
+    const num = Number(budgetInput.replace(/\s+/g, ''));
+    if (!Number.isFinite(num) || num < 0) return;
+    setSavingBudget(true);
+    setBudgetError(null);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ total_budget_rub: num }),
+      });
+      const data = await res.json();
+      if (res.ok && typeof data.total_budget_rub === 'number') {
+        setTotalBudgetRub(data.total_budget_rub);
+        setEditingBudget(false);
+      } else {
+        setBudgetError(data?.error || 'Ошибка сохранения');
+      }
+    } catch {
+      setBudgetError('Ошибка сети');
+    } finally {
+      setSavingBudget(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/admin/product-metrics?date_from=${dateFrom}&date_to=${dateTo}`, {
-      cache: 'no-store',
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled && data.startups) {
-          setStartups(data.startups);
+    Promise.all([
+      fetch(`/api/admin/product-metrics?date_from=${dateFrom}&date_to=${dateTo}`, {
+        cache: 'no-store',
+      }).then((r) => r.json()),
+      fetch(`/api/admin/marketing-metrics?date_from=${dateFrom}&date_to=${dateTo}`, {
+        cache: 'no-store',
+      })
+        .then((r) => r.json())
+        .catch(() => ({ rows: [] })),
+      fetch('/api/admin/settings', { cache: 'no-store' })
+        .then((r) => r.json())
+        .catch(() => ({ total_budget_rub: 0 })),
+    ])
+      .then(([prodData, mktData, settingsData]) => {
+        if (cancelled) return;
+        if (prodData?.startups) {
+          setStartups(prodData.startups);
         }
+        const mktRows: { spend?: number }[] = mktData?.metrics || [];
+        const spendSum = mktRows.reduce((acc, r) => acc + Number(r.spend || 0), 0);
+        setTotalSpend(spendSum);
+        setTotalBudgetRub(Number(settingsData?.total_budget_rub || 0));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -75,6 +120,12 @@ export function ProductMetricsOverview({
   let lastDayDau = 0;
   let lastDayToolCalls = 0;
   let lastDayNewUsers = 0;
+  let prevDayNewUsers = 0;
+  const prevDateObj = new Date(dateTo + 'T00:00:00Z');
+  prevDateObj.setUTCDate(prevDateObj.getUTCDate() - 1);
+  const prevDateStr = Number.isNaN(prevDateObj.getTime())
+    ? ''
+    : prevDateObj.toISOString().slice(0, 10);
   let totalDau = 0;
   let totalToolCalls = 0;
   let totalNewUsers = 0;
@@ -112,6 +163,10 @@ export function ProductMetricsOverview({
     totalNewUsers += sumNew;
 
     const lastDay = s.days.find((d) => d.date === dateTo);
+    const prevDay = prevDateStr ? s.days.find((d) => d.date === prevDateStr) : undefined;
+    if (prevDay) {
+      prevDayNewUsers += prevDay.new_users;
+    }
     if (lastDay) {
       lastDayDau += lastDay.dau;
       lastDayToolCalls += lastDay.llm_requests + lastDay.tool_requests;
@@ -329,58 +384,123 @@ export function ProductMetricsOverview({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Средний DAU в день</span>
-            <Activity className="h-4 w-4 text-indigo-500" />
+            <span>Потраченный бюджет</span>
+            <Wallet className="h-4 w-4 text-indigo-500" />
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-900">
-            {loading
-              ? '...'
-              : (dailySeries.length > 0
-                  ? Math.round(dailySeries.reduce((a, d) => a + d.total, 0) / dailySeries.length)
-                  : 0
-                ).toLocaleString('ru-RU')}
+            {loading ? '...' : `${Math.round(totalSpend).toLocaleString('ru-RU')} ₽`}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            Макс. в день: {Math.max(0, ...dailySeries.map((d) => d.total)).toLocaleString('ru-RU')}
+            {editingBudget ? (
+              <div className="mt-1 flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  value={budgetInput}
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveBudget();
+                    if (e.key === 'Escape') setEditingBudget(false);
+                  }}
+                  placeholder="Весь бюджет, ₽"
+                  autoFocus
+                  className="w-28 rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-800 outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="button"
+                  disabled={savingBudget}
+                  onClick={handleSaveBudget}
+                  title="Сохранить"
+                  className="rounded bg-indigo-600 p-1 text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Check className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBudget(false);
+                    setBudgetError(null);
+                  }}
+                  title="Отмена"
+                  className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span>
+                  {totalBudgetRub > 0
+                    ? `из ${totalBudgetRub.toLocaleString('ru-RU')} ₽ (${Math.round((totalSpend / totalBudgetRub) * 100)}%)`
+                    : 'Весь бюджет не задан'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBudgetInput(totalBudgetRub > 0 ? String(totalBudgetRub) : '');
+                    setEditingBudget(true);
+                  }}
+                  title="Задать общий бюджет"
+                  className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            {budgetError && (
+              <div className="mt-1 text-[11px] text-rose-600">{budgetError}</div>
+            )}
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Tool Calls за {dateTo}</span>
-            <Cpu className="h-4 w-4 text-emerald-500" />
+            <span>Кол-во команд</span>
+            <Users className="h-4 w-4 text-amber-500" />
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-900">
-            {loading ? '...' : lastDayToolCalls.toLocaleString('ru-RU')}
+            {loading ? '...' : startups.length.toLocaleString('ru-RU')}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            Всего за период: {totalToolCalls.toLocaleString('ru-RU')}
+            С данными: {activeWithData} · Алертов: {alerts.length}
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Новые юзеры за {dateTo}</span>
+            <span>Новые юзеры за все время</span>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </div>
+          <div className="mt-2 text-2xl font-bold text-slate-900">
+            {loading ? '...' : totalNewUsers.toLocaleString('ru-RU')}
+          </div>
+          <div className="mt-1 text-xs text-slate-400">
+            Период: {formatDateRu(dateFrom)} — {formatDateRu(dateTo)}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>Новые юзеры за {formatDateRu(dateTo)}</span>
             <UserPlus className="h-4 w-4 text-sky-500" />
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-900">
             {loading ? '...' : lastDayNewUsers.toLocaleString('ru-RU')}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            Всего за период: {totalNewUsers.toLocaleString('ru-RU')}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Проектов с данными</span>
-            <TrendingUp className="h-4 w-4 text-amber-500" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">
-            {loading ? '...' : `${activeWithData} / ${startups.length}`}
-          </div>
-          <div className="mt-1 text-xs text-slate-400">
-            Алертов за {dateTo}: {alerts.length}
+            {prevDayNewUsers > 0 ? (() => {
+              const diffPct = Math.round(((lastDayNewUsers - prevDayNewUsers) / prevDayNewUsers) * 100);
+              return (
+                <span className={diffPct >= 0 ? 'text-emerald-600 font-medium' : 'text-rose-600 font-medium'}>
+                  {diffPct >= 0 ? '+' : ''}{diffPct}% к пред. дню ({prevDayNewUsers.toLocaleString('ru-RU')})
+                </span>
+              );
+            })() : (
+              'Нет данных за пред. день'
+            )}
+            {budgetError && (
+              <div className="mt-1 text-[11px] text-rose-600">{budgetError}</div>
+            )}
           </div>
         </div>
       </div>
@@ -394,14 +514,14 @@ export function ProductMetricsOverview({
               <AlertTriangle className="h-4 w-4 cursor-help text-rose-500" />
               <div className="pointer-events-none absolute left-0 top-6 z-20 hidden w-72 rounded-lg border border-slate-200 bg-slate-900 p-3 text-xs font-normal text-white shadow-lg group-hover:block">
                 <div className="font-semibold mb-1">Как считаются красные флаги:</div>
-                Сравнивается последний день ({dateTo}) со средним DAU за период. Флаг ставится, если:
+                Сравнивается последний день ({formatDateRu(dateTo)}) со средним DAU за период. Флаг ставится, если:
                 <ul className="mt-1 list-disc pl-4 space-y-0.5 text-slate-200">
                   <li>DAU = 0 (при среднем &gt; 5)</li>
                   <li>Падение DAU более чем на 50% от среднего (при среднем &gt; 10)</li>
                 </ul>
               </div>
             </div>
-            Красные флаги ({dateTo})
+            Красные флаги ({formatDateRu(dateTo)})
           </div>
           {alerts.length === 0 ? (
             <div className="text-xs text-slate-500">Резких падений не обнаружено.</div>
@@ -433,8 +553,8 @@ export function ProductMetricsOverview({
               {(
                 [
                   ['dau', 'DAU'],
-                  ['tool_calls', 'Tool Calls'],
                   ['depth', 'Глубина ИИ'],
+                  ['tool_calls', 'Tool Calls'],
                   ['new_users', 'Новые'],
                 ] as const
               ).map(([key, label]) => (
@@ -459,9 +579,9 @@ export function ProductMetricsOverview({
                   <th className="py-1.5">Проект</th>
                   <th className="py-1.5 text-right">Макс. DAU</th>
                   <th className="py-1.5 text-right">Ср. DAU/день</th>
-                  <th className="py-1.5 text-right">Tool Calls</th>
-                  <th className="py-1.5 text-right">Глубина (TC/DAU)</th>
                   <th className="py-1.5 text-right">Новые</th>
+                  <th className="py-1.5 text-right">Глубина (TC/DAU)</th>
+                  <th className="py-1.5 text-right">Tool Calls</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -484,13 +604,13 @@ export function ProductMetricsOverview({
                       </td>
                       <td className="py-1.5 text-right font-mono">{r.maxDau.toLocaleString('ru-RU')}</td>
                       <td className="py-1.5 text-right font-mono">{r.avgDau.toLocaleString('ru-RU')}</td>
-                      <td className="py-1.5 text-right font-mono">
-                        {r.sumToolCalls.toLocaleString('ru-RU')}
-                      </td>
+                      <td className="py-1.5 text-right font-mono">{r.sumNew.toLocaleString('ru-RU')}</td>
                       <td className="py-1.5 text-right font-mono font-semibold text-indigo-600">
                         {r.depth}
                       </td>
-                      <td className="py-1.5 text-right font-mono">{r.sumNew.toLocaleString('ru-RU')}</td>
+                      <td className="py-1.5 text-right font-mono">
+                        {r.sumToolCalls.toLocaleString('ru-RU')}
+                      </td>
                     </tr>
                   );
                 })}
@@ -554,7 +674,7 @@ export function ProductMetricsOverview({
                   >
                     <div className="pointer-events-none absolute -top-2 z-20 hidden -translate-y-full rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] text-white shadow-lg whitespace-nowrap group-hover:block">
                       <div className="font-semibold">
-                        {d.date}: {d.displayTotal.toLocaleString('ru-RU')}
+                        {formatDateRu(d.date)}: {d.displayTotal.toLocaleString('ru-RU')}
                       </div>
                       {chartMetric !== 'depth' &&
                         top3.map((p) => (
@@ -590,7 +710,7 @@ export function ProductMetricsOverview({
                       </div>
                     )}
                     <span className="mt-1.5 text-[10px] text-slate-400">
-                      {d.date.slice(5)}
+                      {formatShortDateRu(d.date)}
                     </span>
                   </div>
                 );
