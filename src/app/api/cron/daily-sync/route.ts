@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { POST as syncProduct } from '@/app/api/admin/product-metrics/route';
 import { POST as syncYandex } from '@/app/api/admin/yandex-sync/route';
+import { POST as syncVk } from '@/app/api/admin/vk-sync/route';
 import { POST as syncTg } from '@/app/api/admin/adstat-sync/route';
 
 export const dynamic = 'force-dynamic';
@@ -29,15 +30,17 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify({ date_from: yesterday, date_to: yesterday }),
     });
 
-  const [product, yandex, tg] = await Promise.allSettled([
+  const [product, yandex, vk, tg] = await Promise.allSettled([
     syncProduct(makePostReq('/api/admin/product-metrics')).then((r) => r.json()),
     syncYandex(makePostReq('/api/admin/yandex-sync')).then((r) => r.json()),
+    syncVk(makePostReq('/api/admin/vk-sync')).then((r) => r.json()),
     syncTg(makePostReq('/api/admin/adstat-sync')).then((r) => r.json()),
   ]);
 
   const results = {
     product: product.status === 'fulfilled' ? product.value : { error: String(product.reason) },
     yandex: yandex.status === 'fulfilled' ? yandex.value : { error: String(yandex.reason) },
+    vk: vk.status === 'fulfilled' ? vk.value : { error: String(vk.reason) },
     tg: tg.status === 'fulfilled' ? tg.value : { error: String(tg.reason) },
   };
 
