@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const sb = getSupabaseAdmin();
   const [{ data: startups }, { data: vkAccounts }] = await Promise.all([
     sb.from('startups').select('id').eq('is_active', true),
-    sb.from('startup_ad_accounts').select('startup_id, external_account_id').eq('source', 'vk_ads'),
+    sb.from('ad_accounts').select('startup_id, external_account_id').eq('source', 'vk_ads'),
   ]);
   const validIds = new Set((startups || []).map((s) => s.id));
   const dbCabinetToStartup: Record<string, string> = {};
