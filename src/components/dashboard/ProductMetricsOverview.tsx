@@ -93,6 +93,8 @@ export function ProductMetricsOverview({
     bestStreak1000: number;
     currentStreak1000: number;
     daysOver1000: number;
+    lastDau: number;
+    dailyDelta: number;
   }[] = [];
 
   for (const s of startups) {
@@ -148,6 +150,16 @@ export function ProductMetricsOverview({
       }
     }
 
+    const lastDauVal = sortedAsc.length > 0 ? sortedAsc[sortedAsc.length - 1].dau : 0;
+    const recentSlice = sortedAsc.slice(-3);
+    const prevSlice = sortedAsc.slice(-6, -3);
+    let dailyDelta = 0;
+    if (recentSlice.length > 0 && prevSlice.length > 0) {
+      const rAvg = recentSlice.reduce((a, d) => a + d.dau, 0) / recentSlice.length;
+      const pAvg = prevSlice.reduce((a, d) => a + d.dau, 0) / prevSlice.length;
+      dailyDelta = Math.round((rAvg - pAvg) / 3);
+    }
+
     ranked.push({
       id: s.id,
       name: s.name,
@@ -160,6 +172,8 @@ export function ProductMetricsOverview({
       bestStreak1000: Math.min(14, bestStreak),
       currentStreak1000: curStreak,
       daysOver1000,
+      lastDau: lastDauVal,
+      dailyDelta,
     });
   }
 
@@ -739,6 +753,89 @@ export function ProductMetricsOverview({
                     </div>
                   );
                 })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Предиктивная аналитика: удержание серии и кандидаты на 1000 DAU */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Прогноз по зачётной серии</h3>
+            <span className="text-[11px] text-slate-400">Активные серии и риск срыва</span>
+          </div>
+          {ranked.filter((r) => r.currentStreak1000 > 0 && r.bestStreak1000 < 14).length === 0 ? (
+            <div className="py-4 text-xs text-slate-400">Нет активных незавершённых серий.</div>
+          ) : (
+            <div className="space-y-2">
+              {ranked
+                .filter((r) => r.currentStreak1000 > 0 && r.bestStreak1000 < 14)
+                .sort((a, b) => b.currentStreak1000 - a.currentStreak1000)
+                .map((r) => {
+                  const left = 14 - r.currentStreak1000;
+                  const safe = r.dailyDelta >= 0 && r.lastDau >= 1050;
+                  return (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
+                    >
+                      <div>
+                        <span className="font-medium text-slate-900">{r.name}</span>
+                        <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                        <div className="text-[11px] text-slate-500">
+                          Осталось {left} дн. · темп {r.dailyDelta >= 0 ? `+${r.dailyDelta}` : r.dailyDelta}/день
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          safe ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {safe ? 'Закроет 14/14' : 'Есть риск'}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Скоро пробьют 1 000 DAU</h3>
+            <span className="text-[11px] text-slate-400">По темпу роста за последние дни</span>
+          </div>
+          {ranked.filter((r) => r.lastDau < 1000 && r.dailyDelta > 0).length === 0 ? (
+            <div className="py-4 text-xs text-slate-400">Пока нет растущих проектов ниже 1 000 DAU.</div>
+          ) : (
+            <div className="space-y-2">
+              {ranked
+                .filter((r) => r.lastDau < 1000 && r.dailyDelta > 0)
+                .map((r) => ({ ...r, daysTo1000: Math.ceil((1000 - r.lastDau) / r.dailyDelta) }))
+                .sort((a, b) => a.daysTo1000 - b.daysTo1000)
+                .slice(0, 6)
+                .map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
+                  >
+                    <div>
+                      <span className="font-medium text-slate-900">{r.name}</span>
+                      <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                      <div className="text-[11px] text-slate-500">
+                        Сейчас {r.lastDau.toLocaleString('ru-RU')} · +{r.dailyDelta}/день
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${
+                        r.daysTo1000 <= 14 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      ~{r.daysTo1000} дн.
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
         </div>
