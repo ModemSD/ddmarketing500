@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppNav } from '@/components/AppNav';
+import { formatDateRu } from '@/lib/dateFormat';
 
 interface CronLog {
   id: string;
@@ -97,7 +98,7 @@ export default function AdminLogsPage() {
                       <td className="py-2.5 pr-4 font-mono text-slate-600 whitespace-nowrap">
                         {new Date(log.created_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}
                       </td>
-                      <td className="py-2.5 pr-4 font-mono whitespace-nowrap">{log.sync_date}</td>
+                      <td className="py-2.5 pr-4 font-mono whitespace-nowrap">{formatDateRu(log.sync_date)}</td>
                       <td className="py-2.5 pr-4 whitespace-nowrap">
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -107,8 +108,65 @@ export default function AdminLogsPage() {
                           {log.status === 'ok' ? 'Успешно' : 'Есть ошибки'}
                         </span>
                       </td>
-                      <td className="py-2.5 font-mono text-[11px] text-slate-600 break-all">
-                        {JSON.stringify(log.results)}
+                      <td className="py-2.5 text-xs text-slate-700">
+                        {(() => {
+                          const r = log.results as any;
+                          if (!r || typeof r !== 'object') {
+                            return <span className="font-mono text-[11px] text-slate-500">{JSON.stringify(log.results)}</span>;
+                          }
+                          const prodErrors = Array.isArray(r.product?.results)
+                            ? r.product.results.filter((x: any) => x.status === 'error')
+                            : [];
+                          return (
+                            <div className="space-y-1">
+                              {r.product && (
+                                <div>
+                                  <span className="font-medium text-slate-900">Продукт:</span>{' '}
+                                  {r.product.ok} из {r.product.total} проектов загружено,{' '}
+                                  <span className={r.product.error > 0 ? 'font-semibold text-rose-600' : 'text-emerald-600'}>
+                                    {r.product.error} ошибок
+                                  </span>
+                                  {prodErrors.length > 0 && (
+                                    <span className="ml-1.5 text-[11px] text-rose-600">
+                                      ({prodErrors.map((e: any) => `${e.name}: ${e.error}`).join('; ')})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {r.yandex?.stats && (
+                                <div>
+                                  <span className="font-medium text-slate-900">Яндекс:</span>{' '}
+                                  Директ {r.yandex.stats.direct_ok} ({r.yandex.stats.direct_err} ош.),{' '}
+                                  Метрика {r.yandex.stats.metrika_ok} ({r.yandex.stats.metrika_err} ош.),{' '}
+                                  AppMetrica {r.yandex.stats.app_ok} ({r.yandex.stats.app_err} ош.)
+                                </div>
+                              )}
+                              {r.vk && (
+                                <div>
+                                  <span className="font-medium text-slate-900">VK Ads:</span>{' '}
+                                  {r.vk.cabinets_ok} кабинетов загружено,{' '}
+                                  <span className={r.vk.cabinets_err > 0 ? 'font-semibold text-rose-600' : 'text-emerald-600'}>
+                                    {r.vk.cabinets_err} ошибок
+                                  </span>
+                                </div>
+                              )}
+                              {r.tg && (
+                                <div>
+                                  <span className="font-medium text-slate-900">TG Ads:</span>{' '}
+                                  загружено {r.tg.matched ?? 0} из {r.tg.fetched ?? 0} (строк: {r.tg.upserted_rows ?? 0})
+                                </div>
+                              )}
+                              <details className="pt-0.5">
+                                <summary className="cursor-pointer text-[10px] text-slate-400 hover:text-slate-600">
+                                  Показать сырой JSON
+                                </summary>
+                                <pre className="mt-1 max-w-2xl overflow-x-auto rounded bg-slate-50 p-2 font-mono text-[10px] text-slate-500">
+                                  {JSON.stringify(log.results, null, 2)}
+                                </pre>
+                              </details>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
