@@ -63,14 +63,17 @@ export async function POST(req: NextRequest) {
   const agg: Record<string, { startup_id: string; date: string; impressions: number; clicks: number; spend: number; conversions: number }> = {};
   let okCabinets = 0;
   let errCabinets = 0;
+  const cabinetErrors: { cabinet_id?: string; token_prefix: string; error: string }[] = [];
 
   for (const token of tokens) {
+    const tokenPrefix = `${token.slice(0, 6)}…`;
     try {
       const userRes = await fetch('https://ads.vk.com/api/v2/user.json', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!userRes.ok) {
         errCabinets++;
+        cabinetErrors.push({ token_prefix: tokenPrefix, error: `user.json HTTP ${userRes.status}` });
         continue;
       }
       const userJson = await userRes.json();
@@ -99,6 +102,11 @@ export async function POST(req: NextRequest) {
       );
       if (!statsRes.ok) {
         errCabinets++;
+        cabinetErrors.push({
+          cabinet_id: cabinetId || undefined,
+          token_prefix: tokenPrefix,
+          error: `statistics HTTP ${statsRes.status}`,
+        });
         continue;
       }
       const statsJson = await statsRes.json();
@@ -118,8 +126,12 @@ export async function POST(req: NextRequest) {
         }
       }
       okCabinets++;
-    } catch {
+    } catch (err) {
       errCabinets++;
+      cabinetErrors.push({
+        token_prefix: tokenPrefix,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      });
     }
   }
 
@@ -147,5 +159,6 @@ export async function POST(req: NextRequest) {
     cabinets_ok: okCabinets,
     cabinets_err: errCabinets,
     upserted_rows: rows.length,
+    errors: cabinetErrors,
   });
 }

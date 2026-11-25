@@ -148,6 +148,11 @@ export default function AdminLogsPage() {
                                   <span className={r.vk.cabinets_err > 0 ? 'font-semibold text-rose-600' : 'text-emerald-600'}>
                                     {r.vk.cabinets_err} ошибок
                                   </span>
+                                  {Array.isArray(r.vk.errors) && r.vk.errors.length > 0 && (
+                                    <span className="ml-1.5 text-[11px] text-rose-600">
+                                      ({r.vk.errors.map((e: any) => `${e.cabinet_id ? `каб. ${e.cabinet_id}` : e.token_prefix}: ${e.error}`).join('; ')})
+                                    </span>
+                                  )}
                                 </div>
                               )}
                               {r.tg && (
