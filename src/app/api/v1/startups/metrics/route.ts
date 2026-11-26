@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       total_users: totalUsers,
       tool_calls_per_dau: toolCallsPerDau,
     };
-  });
+  }).filter((item) => item.avg_dau > 0 || item.peak_dau > 0 || item.total_users > 0);
 
   return NextResponse.json({
     ok: true,
