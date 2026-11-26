@@ -1091,7 +1091,7 @@ export function ProductMetricsOverview({
         type AnomalyItem = {
           id: string;
           name: string;
-          type: 'Скачок DAU' | 'Глубина ИИ' | 'Пустой трафик' | 'Провал D1';
+          type: 'Скачок DAU' | 'Глубина ИИ' | 'Всплеск без D1' | 'Провал D1';
           badgeClass: string;
           detail: string;
         };
@@ -1145,7 +1145,7 @@ export function ProductMetricsOverview({
               anomalies.push({
                 id: s.id,
                 name: s.name,
-                type: 'Пустой трафик',
+                type: 'Всплеск без D1',
                 badgeClass: 'bg-amber-50 text-amber-700',
                 detail: `+${lastRet.new_users} новых (ср. ${Math.round(avgNew)}), но D1 = ${lastD1Pct.toFixed(1)}% (${formatDateRu(lastRet.date)})`,
               });
@@ -1167,7 +1167,7 @@ export function ProductMetricsOverview({
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Аномалии</h3>
                 <p className="text-xs text-slate-500">
-                  Автоматический поиск резких скачков DAU, перекосов глубины ИИ, пустого трафика и провалов D1
+                  Автоматический поиск резких скачков DAU, перекосов глубины ИИ, всплесков без удержания и провалов D1
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
