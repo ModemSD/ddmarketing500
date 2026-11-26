@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { formatDateRu, formatShortDateRu } from '@/lib/dateFormat';
-import { Download, Users, Wallet, UserPlus, AlertTriangle, TrendingUp, Pencil, Check, X } from 'lucide-react';
+import { Download, Users, Wallet, UserPlus, AlertTriangle, TrendingUp, Pencil, Check, X, HelpCircle } from 'lucide-react';
 
 interface DayRow {
   date: string;
@@ -1028,7 +1028,14 @@ export function ProductMetricsOverview({
                   Взвешенный % возврата от новых юзеров за период ({retRows.length} проектов с данными)
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="group relative flex items-center">
+                  <HelpCircle className="h-4 w-4 cursor-help text-slate-400 hover:text-indigo-600" />
+                  <div className="pointer-events-none absolute right-0 top-6 z-30 hidden w-80 rounded-lg bg-slate-900 p-3 text-[11px] font-normal leading-relaxed text-white shadow-xl group-hover:block">
+                    <div className="mb-1 font-semibold text-indigo-300">Как считается среднее:</div>
+                    Для каждого проекта считается взвешенный Retention: сумма вернувшихся на день X делится на сумму новых юзеров только за те дни, где уже есть данные D(X). Затем берётся среднее по всем проектам с данными.
+                  </div>
+                </div>
                 {[
                   ['Ср. D1', avgD1],
                   ['Ср. D3', avgD3],

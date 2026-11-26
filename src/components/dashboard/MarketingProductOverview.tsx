@@ -63,6 +63,7 @@ export function MarketingProductOverview({
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [solutionUrlsMap, setSolutionUrlsMap] = useState<Record<string, string[]>>({});
   const [openUrlMenuId, setOpenUrlMenuId] = useState<string | null>(null);
+  const [spendChannelFilter, setSpendChannelFilter] = useState<'all' | 'yandex_direct' | 'vk_ads' | 'tg_ads'>('all');
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'spend' | 'cac' | 'new_users' | 'total_users' | 'dau' | 'avg_dau_7' | 'avg_dau_14' | 'max_dau' | 'depth' | 'cost_dau'>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -157,6 +158,7 @@ export function MarketingProductOverview({
   // 3. Динамика по дням: Расход vs Новые юзеры
   const dailyMap: Record<string, { date: string; spend: number; newUsers: number }> = {};
   for (const r of mktRows) {
+    if (spendChannelFilter !== 'all' && r.source !== spendChannelFilter) continue;
     if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, spend: 0, newUsers: 0 };
     dailyMap[r.date].spend += Number(r.spend || 0);
   }
@@ -340,16 +342,16 @@ export function MarketingProductOverview({
               {loading ? '...' : `${Math.round(totalSpend).toLocaleString('ru-RU')} ₽`}
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+          <div className="flex items-start justify-between rounded-lg bg-slate-50 p-3">
             <div>
               <div className="text-[11px] text-slate-500">Показы</div>
               <div className="mt-1 text-lg font-bold text-slate-900">
                 {loading ? '...' : totalImpressions.toLocaleString('ru-RU')}
               </div>
             </div>
-            <ArrowRight className="hidden h-4 w-4 text-slate-300 sm:block" />
+            <ArrowRight className="hidden h-4 w-4 self-center text-slate-300 sm:block" />
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+          <div className="flex items-start justify-between rounded-lg bg-slate-50 p-3">
             <div>
               <div className="text-[11px] text-slate-500">
                 Клики (CTR {totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 0}%)
@@ -358,9 +360,9 @@ export function MarketingProductOverview({
                 {loading ? '...' : totalClicks.toLocaleString('ru-RU')}
               </div>
             </div>
-            <ArrowRight className="hidden h-4 w-4 text-slate-300 sm:block" />
+            <ArrowRight className="hidden h-4 w-4 self-center text-slate-300 sm:block" />
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
+          <div className="flex items-start justify-between rounded-lg bg-slate-50 p-3">
             <div>
               <div className="text-[11px] text-slate-500">Конверсии / Уст.</div>
               <div className="mt-1 text-lg font-bold text-slate-900">
@@ -372,7 +374,7 @@ export function MarketingProductOverview({
                 </div>
               )}
             </div>
-            <ArrowRight className="hidden h-4 w-4 text-slate-300 sm:block" />
+            <ArrowRight className="hidden h-4 w-4 self-center text-slate-300 sm:block" />
           </div>
           <div className="rounded-lg bg-indigo-50 p-3">
             <div className="text-[11px] text-indigo-700">
@@ -411,18 +413,43 @@ export function MarketingProductOverview({
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
               Динамика: Расход (₽) vs Новые юзеры
-              <InfoTip text="Синие столбцы — суммарный рекламный расход за день по всем каналам. Зелёные столбцы — новые регистрации (New Users) в продуктах за этот же день." />
+              <InfoTip text="Синие столбцы — суммарный рекламный расход за день по выбранному каналу. Зелёные столбцы — новые регистрации (New Users) в продуктах за этот же день." />
             </div>
-            <div className="flex items-center gap-3 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> Расход
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> New Users
-              </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 text-[11px]">
+                {(
+                  [
+                    ['all', 'Все'],
+                    ['yandex_direct', 'Яндекс'],
+                    ['vk_ads', 'VK Ads'],
+                    ['tg_ads', 'TG Ads'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSpendChannelFilter(key)}
+                    className={`rounded-md px-2 py-0.5 font-medium transition-colors ${
+                      spendChannelFilter === key
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> Расход
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> New Users
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex h-40 items-end gap-1.5 pt-4">
@@ -590,7 +617,24 @@ export function MarketingProductOverview({
                   className="group relative flex items-center gap-3 rounded-md px-1 py-0.5 text-xs transition-colors hover:bg-slate-50"
                 >
                   <div className="w-28 shrink-0 text-slate-600">
-                    {w.weekStart} ({w.daysCount} дн.)
+                    {formatDateRu(w.weekStart)} ({w.daysCount} дн.)
+                  </div>
+                  <div className="pointer-events-none absolute left-32 -top-2 z-30 hidden -translate-y-full rounded-lg bg-slate-900 px-3 py-2 text-[11px] text-white shadow-lg whitespace-nowrap group-hover:block">
+                    <div className="mb-1 font-semibold text-slate-200">
+                      Неделя с {formatDateRu(w.weekStart)} ({w.daysCount} дн.)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      <span>Яндекс Директ: {Math.round(w.directPerDay).toLocaleString('ru-RU')} ₽/день</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-orange-500" />
+                      <span>VK Ads: {Math.round(w.vkPerDay).toLocaleString('ru-RU')} ₽/день</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span>TG Ads: {Math.round(w.tgPerDay).toLocaleString('ru-RU')} ₽/день</span>
+                    </div>
                   </div>
                   <div className="flex h-5 flex-1 overflow-hidden rounded bg-slate-100 transition-transform duration-200 group-hover:scale-y-110">
                     <div
