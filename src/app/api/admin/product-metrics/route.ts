@@ -39,19 +39,31 @@ export async function GET(req: NextRequest) {
     const { data: startups, error: sErr } = await startupsQuery;
     if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
 
-    let metricsQuery = supabase
-      .from('daily_product_metrics')
-      .select('*')
-      .gte('date', dateFrom)
-      .lte('date', dateTo)
-      .order('date', { ascending: false });
+    const metrics: (DailyMetricRow & { startup_id: string })[] = [];
+    const pageSize = 1000;
+    let from = 0;
 
-    if (startupId && startupId !== 'all') {
-      metricsQuery = metricsQuery.eq('startup_id', startupId);
+    while (true) {
+      let metricsQuery = supabase
+        .from('daily_product_metrics')
+        .select('*')
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .order('date', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (startupId && startupId !== 'all') {
+        metricsQuery = metricsQuery.eq('startup_id', startupId);
+      }
+
+      const { data: pageData, error: mErr } = await metricsQuery;
+      if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
+      if (!pageData || pageData.length === 0) break;
+
+      metrics.push(...pageData);
+      if (pageData.length < pageSize) break;
+      from += pageSize;
     }
-
-    const { data: metrics, error: mErr } = await metricsQuery;
-    if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
 
     const byStartup: Record<string, DailyMetricRow[]> = {};
     for (const row of metrics || []) {
