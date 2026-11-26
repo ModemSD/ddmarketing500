@@ -62,6 +62,9 @@ export function MarketingProductOverview({
   const [prodStartups, setProdStartups] = useState<StartupProduct[]>([]);
   const [mktRows, setMktRows] = useState<MarketingRow[]>([]);
   const [solutionUrlsMap, setSolutionUrlsMap] = useState<Record<string, string[]>>({});
+  const [techAuditMap, setTechAuditMap] = useState<
+    Record<string, { dau_status: string; dau_comment: string; tool_calls_status: string; tool_calls_comment: string }>
+  >({});
   const [openUrlMenuId, setOpenUrlMenuId] = useState<string | null>(null);
   const [spendChannelFilter, setSpendChannelFilter] = useState<'all' | 'yandex_direct' | 'vk_ads' | 'tg_ads'>('all');
   const [loading, setLoading] = useState(true);
@@ -85,8 +88,11 @@ export function MarketingProductOverview({
       fetch('/api/admin/startups', { cache: 'no-store' })
         .then((r) => r.json())
         .catch(() => ({ startups: [] })),
+      fetch('/api/admin/tech-audit', { cache: 'no-store' })
+        .then((r) => r.json())
+        .catch(() => ({ rows: [] })),
     ])
-      .then(([pData, mData, sData]) => {
+      .then(([pData, mData, sData, taData]) => {
         if (cancelled) return;
         setProdStartups(pData.startups || []);
         setMktRows(mData.metrics || []);
@@ -97,6 +103,16 @@ export function MarketingProductOverview({
           }
         }
         setSolutionUrlsMap(urlMap);
+        const taMap: Record<string, { dau_status: string; dau_comment: string; tool_calls_status: string; tool_calls_comment: string }> = {};
+        for (const row of taData?.rows || []) {
+          taMap[row.startup_id] = {
+            dau_status: row.dau_status || '',
+            dau_comment: row.dau_comment || '',
+            tool_calls_status: row.tool_calls_status || '',
+            tool_calls_comment: row.tool_calls_comment || '',
+          };
+        }
+        setTechAuditMap(taMap);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -831,6 +847,63 @@ export function MarketingProductOverview({
         );
       })()}
 
+      {/* Тех аудит: сводка */}
+      {(() => {
+        const taVals = Object.values(techAuditMap);
+        const totalProjects = taVals.length || unitRows.length;
+        const totalChecked = taVals.filter(
+          (a) => a.dau_status !== '' || a.tool_calls_status !== ''
+        ).length;
+        const fullCompliant = taVals.filter(
+          (a) => a.dau_status === 'compliant' && a.tool_calls_status === 'compliant'
+        ).length;
+        const partialCompliant = taVals.filter(
+          (a) =>
+            (a.dau_status === 'compliant' || a.tool_calls_status === 'compliant') &&
+            !(a.dau_status === 'compliant' && a.tool_calls_status === 'compliant')
+        ).length;
+        const dauIssues = taVals.filter(
+          (a) => a.dau_status === 'partial' || a.dau_status === 'non_compliant'
+        ).length;
+        const tcIssues = taVals.filter(
+          (a) => a.tool_calls_status === 'partial' || a.tool_calls_status === 'non_compliant'
+        ).length;
+
+        return (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 text-sm font-semibold text-slate-900">Тех аудит</div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[11px] text-slate-500">Всего проверено</div>
+                <div className="mt-1 text-lg font-bold text-slate-900">
+                  {totalChecked}{' '}
+                  <span className="text-xs font-normal text-slate-400">/ {totalProjects}</span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[11px] text-slate-500">Полностью соответствуют</div>
+                <div className="mt-1 text-lg font-bold text-emerald-700">
+                  {fullCompliant}{' '}
+                  <span className="text-xs font-normal text-slate-400">/ {totalProjects}</span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[11px] text-slate-500">Частично (≥1 зелёная)</div>
+                <div className="mt-1 text-lg font-bold text-amber-700">{partialCompliant}</div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[11px] text-slate-500">Проблем с DAU</div>
+                <div className="mt-1 text-lg font-bold text-rose-700">{dauIssues}</div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-3">
+                <div className="text-[11px] text-slate-500">Проблем с Tool Calls</div>
+                <div className="mt-1 text-lg font-bold text-rose-700">{tcIssues}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 8. Сводная таблица Unit-экономики */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -923,6 +996,45 @@ export function MarketingProductOverview({
                       );
                     })()}
                     <span className="font-mono text-slate-400">{r.id}</span>
+                    {(() => {
+                      const ta = techAuditMap[r.id];
+                      const dotColor = (st?: string) => {
+                        if (st === 'compliant') return 'bg-emerald-500';
+                        if (st === 'partial') return 'bg-amber-400';
+                        if (st === 'non_compliant') return 'bg-rose-500';
+                        return 'bg-slate-300';
+                      };
+                      const statusLabel = (st?: string) => {
+                        if (st === 'compliant') return 'Соответствует';
+                        if (st === 'partial') return 'Частично соответствует';
+                        if (st === 'non_compliant') return 'Не соответствует';
+                        return 'Не проверено';
+                      };
+                      return (
+                        <div
+                          className="group relative ml-1 inline-flex items-center gap-1 cursor-help"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${dotColor(ta?.dau_status)}`} />
+                          <span className={`h-2 w-2 rounded-full ${dotColor(ta?.tool_calls_status)}`} />
+                          <div className="pointer-events-none absolute left-0 top-5 z-40 hidden w-80 whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-[11px] font-normal leading-relaxed text-white shadow-xl group-hover:block">
+                            <div className="mb-1.5 font-semibold text-indigo-300">Тех аудит</div>
+                            <div className="mb-2">
+                              <span className="font-semibold">DAU:</span> {statusLabel(ta?.dau_status)}
+                              {ta?.dau_comment && (
+                                <div className="mt-0.5 text-slate-300">{ta.dau_comment}</div>
+                              )}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Tool Calls:</span> {statusLabel(ta?.tool_calls_status)}
+                              {ta?.tool_calls_comment && (
+                                <div className="mt-0.5 text-slate-300">{ta.tool_calls_comment}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </td>
                 <td className="max-w-[170px] py-2 pr-3 font-sans text-[10px] leading-tight text-slate-500">
