@@ -11,6 +11,10 @@ interface DailyMetricRow {
   tool_requests: number;
   total_users: number;
   new_users?: number;
+  retained_d1?: number | null;
+  retained_d3?: number | null;
+  retained_d7?: number | null;
+  retained_d14?: number | null;
   is_final?: boolean;
 }
 
@@ -69,9 +73,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const dateFrom = String(body.date_from || '2026-11-05');
-    const dateTo = String(body.date_to || '2026-11-17');
+    const body = await req.json().catch(() => ({}));
+    const nowMsk = new Date(Date.now() + 3 * 3600 * 1000);
+    const yesterdayMsk = new Date(nowMsk);
+    yesterdayMsk.setUTCDate(yesterdayMsk.getUTCDate() - 1);
+    const from15dMsk = new Date(yesterdayMsk);
+    from15dMsk.setUTCDate(from15dMsk.getUTCDate() - 14);
+    const dateFrom = String(body.date_from || from15dMsk.toISOString().slice(0, 10));
+    const dateTo = String(body.date_to || yesterdayMsk.toISOString().slice(0, 10));
     const startupIds: string[] | null =
       Array.isArray(body.startup_ids) && body.startup_ids.length > 0
         ? body.startup_ids.map(String)
@@ -105,7 +114,7 @@ export async function POST(req: NextRequest) {
           url.searchParams.set('date_to', dateTo);
 
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
+          const timeout = setTimeout(() => controller.abort(), 45000);
 
           const res = await fetch(url.toString(), {
             method: 'GET',
@@ -138,6 +147,10 @@ export async function POST(req: NextRequest) {
               tool_requests: Number(d.tool_requests) || 0,
               total_users: Number(d.total_users) || 0,
               new_users: Number(d.new_users) || 0,
+              retained_d1: d.retained_d1 != null ? Number(d.retained_d1) : null,
+              retained_d3: d.retained_d3 != null ? Number(d.retained_d3) : null,
+              retained_d7: d.retained_d7 != null ? Number(d.retained_d7) : null,
+              retained_d14: d.retained_d14 != null ? Number(d.retained_d14) : null,
               is_final: Boolean(d.is_final),
               fetched_at: nowIso,
             }));

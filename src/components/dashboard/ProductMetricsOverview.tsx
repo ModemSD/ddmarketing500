@@ -11,6 +11,10 @@ interface DayRow {
   tool_requests: number;
   total_users: number;
   new_users: number;
+  retained_d1?: number | null;
+  retained_d3?: number | null;
+  retained_d7?: number | null;
+  retained_d14?: number | null;
 }
 
 interface StartupMetrics {
@@ -960,6 +964,242 @@ export function ProductMetricsOverview({
           )}
         </div>
       </div>
+
+      {/* Retention Report */}
+      {(() => {
+        const calcRet = (days: DayRow[], field: 'retained_d1' | 'retained_d3' | 'retained_d7' | 'retained_d14') => {
+          let retSum = 0;
+          let newSum = 0;
+          for (const d of days) {
+            const val = d[field];
+            if (val != null && d.new_users > 0) {
+              retSum += val;
+              newSum += d.new_users;
+            }
+          }
+          return newSum > 0 ? Math.round((retSum / newSum) * 1000) / 10 : null;
+        };
+
+        const retRows = startups
+          .map((s) => {
+            const days = s.days || [];
+            const d1 = calcRet(days, 'retained_d1');
+            const d3 = calcRet(days, 'retained_d3');
+            const d7 = calcRet(days, 'retained_d7');
+            const d14 = calcRet(days, 'retained_d14');
+            const newSum = days.reduce((acc, d) => acc + (d.new_users || 0), 0);
+            return { id: s.id, name: s.name, newSum, d1, d3, d7, d14 };
+          })
+          .filter((r) => r.d1 !== null || r.d3 !== null || r.d7 !== null || r.d14 !== null)
+          .sort((a, b) => (b.d1 ?? -1) - (a.d1 ?? -1));
+
+        if (retRows.length === 0) return null;
+
+        const avgField = (key: 'd1' | 'd3' | 'd7' | 'd14') => {
+          const vals = retRows.map((r) => r[key]).filter((v): v is number => v !== null);
+          if (vals.length === 0) return null;
+          return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+        };
+
+        const avgD1 = avgField('d1');
+        const avgD3 = avgField('d3');
+        const avgD7 = avgField('d7');
+        const avgD14 = avgField('d14');
+
+        const heatStyle = (v: number | null): React.CSSProperties => {
+          if (v === null) return { backgroundColor: '#f8fafc', color: '#cbd5e1' };
+          const ratio = Math.min(1, Math.max(0, v / 40));
+          // Плавный градиент от светло-индиго (#eef2ff) к насыщенному индиго (#4338ca)
+          const r = Math.round(238 - ratio * (238 - 67));
+          const g = Math.round(242 - ratio * (242 - 56));
+          const b = Math.round(255 - ratio * (255 - 202));
+          return {
+            backgroundColor: `rgb(${r}, ${g}, ${b})`,
+            color: ratio >= 0.55 ? '#ffffff' : '#1e1b4b',
+          };
+        };
+
+        return (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Удержание пользователей (Retention)</h3>
+                <p className="text-xs text-slate-500">
+                  Взвешенный % возврата от новых юзеров за период ({retRows.length} проектов с данными)
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[
+                  ['Ср. D1', avgD1],
+                  ['Ср. D3', avgD3],
+                  ['Ср. D7', avgD7],
+                  ['Ср. D14', avgD14],
+                ].map(([label, val]) => (
+                  <div key={String(label)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
+                    <span className="text-slate-500">{label}: </span>
+                    <span className="font-mono font-semibold text-slate-900">
+                      {val !== null ? `${val}%` : '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-1.5">Проект</th>
+                    <th className="py-1.5 text-right">Новые юзеры</th>
+                    <th className="py-1.5 text-right">D1</th>
+                    <th className="py-1.5 text-right">D3</th>
+                    <th className="py-1.5 text-right">D7</th>
+                    <th className="py-1.5 text-right">D14</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {retRows.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50/60">
+                      <td className="py-1.5 pr-3">
+                        <span className="font-medium text-slate-900">{r.name}</span>
+                        <span className="ml-1.5 font-mono text-slate-400">{r.id}</span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-slate-600">
+                        {r.newSum.toLocaleString('ru-RU')}
+                      </td>
+                      {[r.d1, r.d3, r.d7, r.d14].map((val, idx) => (
+                        <td key={idx} className="p-1">
+                          <div
+                            style={heatStyle(val)}
+                            className="rounded-md px-2.5 py-1.5 text-center font-mono text-[11px] font-semibold transition-colors"
+                          >
+                            {val !== null ? `${val}%` : '—'}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Anomalies Block */}
+      {(() => {
+        type AnomalyItem = {
+          id: string;
+          name: string;
+          type: 'Скачок DAU' | 'Глубина ИИ' | 'Пустой трафик' | 'Провал D1';
+          badgeClass: string;
+          detail: string;
+        };
+        const anomalies: AnomalyItem[] = [];
+
+        for (const s of startups) {
+          const days = [...(s.days || [])].sort((a, b) => a.date.localeCompare(b.date));
+          if (days.length < 4) continue;
+
+          const last = days[days.length - 1];
+          const prev7 = days.slice(Math.max(0, days.length - 8), days.length - 1);
+          const prev7AvgDau = prev7.reduce((a, d) => a + d.dau, 0) / prev7.length;
+
+          if (prev7AvgDau >= 20 && last.dau >= prev7AvgDau * 2) {
+            const mult = (last.dau / prev7AvgDau).toFixed(1);
+            anomalies.push({
+              id: s.id,
+              name: s.name,
+              type: 'Скачок DAU',
+              badgeClass: 'bg-emerald-50 text-emerald-700',
+              detail: `${last.dau.toLocaleString('ru-RU')} (×${mult} к ср. ${Math.round(prev7AvgDau)}) за ${formatDateRu(last.date)}`,
+            });
+          }
+
+          const depthDays = prev7.filter((d) => d.dau > 0);
+          if (last.dau >= 20 && depthDays.length >= 3) {
+            const avgDepth =
+              depthDays.reduce((a, d) => a + (d.llm_requests + d.tool_requests) / d.dau, 0) / depthDays.length;
+            const lastDepth = (last.llm_requests + last.tool_requests) / last.dau;
+            if (avgDepth >= 2 && (lastDepth >= avgDepth * 2 || lastDepth <= avgDepth * 0.4)) {
+              anomalies.push({
+                id: s.id,
+                name: s.name,
+                type: 'Глубина ИИ',
+                badgeClass: 'bg-indigo-50 text-indigo-700',
+                detail: `${lastDepth.toFixed(1)} (было ср. ${avgDepth.toFixed(1)}) за ${formatDateRu(last.date)}`,
+              });
+            }
+          }
+
+          const retDays = days.filter((d) => d.retained_d1 != null && d.new_users >= 20);
+          if (retDays.length >= 3) {
+            const lastRet = retDays[retDays.length - 1];
+            const prevRet = retDays.slice(0, -1);
+            const avgNew = days.reduce((a, d) => a + d.new_users, 0) / days.length;
+            const lastD1Pct = (lastRet.retained_d1! / lastRet.new_users) * 100;
+            const avgD1Pct =
+              prevRet.reduce((a, d) => a + (d.retained_d1! / d.new_users) * 100, 0) / prevRet.length;
+
+            if (avgNew >= 20 && lastRet.new_users >= avgNew * 2 && lastD1Pct < 5) {
+              anomalies.push({
+                id: s.id,
+                name: s.name,
+                type: 'Пустой трафик',
+                badgeClass: 'bg-amber-50 text-amber-700',
+                detail: `+${lastRet.new_users} новых (ср. ${Math.round(avgNew)}), но D1 = ${lastD1Pct.toFixed(1)}% (${formatDateRu(lastRet.date)})`,
+              });
+            } else if (avgD1Pct >= 10 && lastD1Pct < avgD1Pct * 0.5) {
+              anomalies.push({
+                id: s.id,
+                name: s.name,
+                type: 'Провал D1',
+                badgeClass: 'bg-rose-50 text-rose-700',
+                detail: `D1 упал до ${lastD1Pct.toFixed(1)}% (ср. ${avgD1Pct.toFixed(1)}%) за ${formatDateRu(lastRet.date)}`,
+              });
+            }
+          }
+        }
+
+        return (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Аномалии</h3>
+                <p className="text-xs text-slate-500">
+                  Автоматический поиск резких скачков DAU, перекосов глубины ИИ, пустого трафика и провалов D1
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                {anomalies.length}
+              </span>
+            </div>
+            {anomalies.length === 0 ? (
+              <div className="text-xs text-slate-400">Аномалий за выбранный период не обнаружено.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {anomalies.map((a, idx) => (
+                  <div
+                    key={`${a.id}-${a.type}-${idx}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-900 truncate">{a.name}</span>
+                        <span className="font-mono text-slate-400">{a.id}</span>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">{a.detail}</div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${a.badgeClass}`}>
+                      {a.type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

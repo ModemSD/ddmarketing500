@@ -14,6 +14,10 @@ interface DayRow {
   tool_requests: number;
   total_users: number;
   new_users: number;
+  retained_d1?: number | null;
+  retained_d3?: number | null;
+  retained_d7?: number | null;
+  retained_d14?: number | null;
   is_final: boolean;
 }
 
@@ -482,6 +486,10 @@ export default function ProductMetricsPage() {
                                       <th className="py-1.5 text-right">Tools</th>
                                       <th className="py-1.5 text-right">Tool Calls</th>
                                       <th className="py-1.5 text-right">New Users</th>
+                                      <th className="py-1.5 text-right">D1</th>
+                                      <th className="py-1.5 text-right">D3</th>
+                                      <th className="py-1.5 text-right">D7</th>
+                                      <th className="py-1.5 text-right">D14</th>
                                       <th className="py-1.5 text-right">Total Users</th>
                                       <th className="py-1.5 text-right">Final</th>
                                     </tr>
@@ -497,6 +505,15 @@ export default function ProductMetricsPage() {
                                           {d.llm_requests + d.tool_requests}
                                         </td>
                                         <td className="py-1.5 text-right">{d.new_users}</td>
+                                        {[d.retained_d1, d.retained_d3, d.retained_d7, d.retained_d14].map((ret, idx) => (
+                                          <td key={idx} className="py-1.5 text-right text-slate-600">
+                                            {ret != null
+                                              ? d.new_users > 0
+                                                ? `${ret} (${Math.round((ret / d.new_users) * 100)}%)`
+                                                : ret
+                                              : '—'}
+                                          </td>
+                                        ))}
                                         <td className="py-1.5 text-right">{d.total_users}</td>
                                         <td className="py-1.5 text-right">
                                           {d.is_final ? '✓' : '…'}
